@@ -6,6 +6,12 @@ import os
 import shlex
 import json # 需要导入 json 来解析 ffprobe 输出
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import re
+import subprocess
+import shutil
+from pathlib import Path
+import glob
+from typing import List, Dict
 
 def get_video_duration_ffmpeg(video_path: str) -> float | None:
     """
@@ -590,3 +596,280 @@ def split_video(input_video, output_dir, file_prefix, partition_seconds= 600, bu
             object_path= f"{object_path}/{file_name}"
         )
     return results 
+
+
+def split_video_single_command(
+        video_path: str, 
+        bucket_name: str,
+        object_path: str,
+        segment_duration_sec: int, 
+        need_upload_to_gcs: bool
+    ) -> List[str]:
+    """
+    使用单一的 ffmpeg 命令和 segment 复用器将视频高效地分割成均匀长度的部分。
+
+    这是性能最优的方法。
+
+    :param video_path: 完整的输入视频文件路径 (例如 "/a/b/c/filename.mp4")。
+    :param segment_duration_sec: 每个分段的时长（秒）。
+    :return: 一个包含所有生成的文件路径的列表。
+    """
+    # --- 1. 检查和准备 ---
+    if not shutil.which('ffmpeg'):
+        print("错误: ffmpeg 命令未找到。请确保 FFmpeg 已正确安装并添加到系统 PATH。")
+        return []
+
+    path_obj = Path(video_path)
+    if not path_obj.is_file():
+        print(f"错误: 输入的视频路径不是一个有效文件 -> {video_path}")
+        return []
+
+    # --- 2. 路径和文件名模式处理 ---
+    file_dir = path_obj.parent
+    file_stem = path_obj.stem
+    file_suffix = path_obj.suffix
+
+    # 为 ffmpeg 创建输出文件名模式，例如: /a/b/c/filename_part_%d.mp4
+    # %d 会被 ffmpeg 自动替换为 0, 1, 2, ...
+    # 如果希望是 001, 002 这种格式，可以使用 %03d
+    output_pattern = file_dir / f"{file_stem}_{segment_duration_sec}_part_%d{file_suffix}"
+    
+    print(f"输入视频: {path_obj}")
+    print(f"分段时长: {segment_duration_sec} 秒")
+    print(f"输出模式: {output_pattern}")
+
+    # --- 3. 构建并执行单一的 ffmpeg 命令 ---
+    command = [
+        'ffmpeg',
+        '-i', str(path_obj),              # 输入文件
+        '-c', 'copy',                     # 直接复制流
+        '-f', 'segment',                  # 使用 segment 复用器
+        '-segment_time', str(segment_duration_sec), # 设置分段时长
+        '-reset_timestamps', '1',         # 重置时间戳
+        '-y',                             # 覆盖已存在的文件
+        str(output_pattern)               # 指定输出模式
+    ]
+
+    print("\n正在执行高效分割命令...")
+    try:
+        # 执行命令
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        print("✅ [成功] ffmpeg 命令执行完毕。")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ [失败] ffmpeg 命令执行时出错。")
+        print(f"FFmpeg 错误信息:\n{e.stderr.decode('utf-8', errors='ignore')}")
+        return []
+
+    # --- 4. 查找并返回生成的文件列表 ---
+    # 由于是 ffmpeg 自动生成的文件，我们需要在命令执行后去查找它们
+    search_glob = file_dir / f"{file_stem}_{segment_duration_sec}_part_*{file_suffix}"
+
+    related_files = glob.glob(str(search_glob))
+
+    created_files = sorted(
+        related_files,
+        key=lambda f: int(re.search(r'_part_(\d+)', f).group(1))
+    )
+    
+    print(f"\n成功生成了 {len(created_files)} 个文件。")
+
+    file_index_dict = {filename: index for index, filename in enumerate(created_files)}
+    # print(file_index_dict)
+
+    if need_upload_to_gcs:
+        r = cloud_gcs.upload_parts_to_gcs_parallel(
+            local_files = created_files, 
+            bucket_name= bucket_name, 
+            object_path = object_path, 
+            max_workers  = 8
+        )
+
+        r_by_index_order = {}
+
+        for filename,index in file_index_dict.items():
+            r_by_index_order[index] = r[filename]
+        return r_by_index_order
+    else:
+        # r = {file_path: None for file_path in created_files}
+        r_by_index_order = {index: [filename] for index, filename in enumerate(created_files)}
+    return  r_by_index_order
+   
+
+def create_stitched_video_from_data_v2(segments_data, split_videos, output_video_path, ffmpeg_path='ffmpeg'):
+    """
+    Creates a new video by stitching segments from split video files using FFmpeg.
+    
+    This is the v2 version that works with pre-split video files instead of a single original video.
+
+    Args:
+        segments_data (list): A list of dictionaries, each with:
+            - 'part': string indicating which split video to use (corresponds to split_videos key)
+            - 'timestamp_relative': string in format "MM:SS.ms-MM:SS.ms" indicating the relative time in that part
+        split_videos (dict): Dictionary where:
+            - key: part index (int) 
+            - value: list where first element [0] is the local file path of the split video
+        output_video_path (str): Path for the newly created output video file.
+        ffmpeg_path (str): Path to the FFmpeg executable.
+
+    Example:
+        segments_data = [
+            {"part": "0", "timestamp_relative": "00:00.000-00:12.583"},
+            {"part": "0", "timestamp_relative": "00:12.583-00:28.416"},
+            {"part": "1", "timestamp_relative": "00:05.000-00:20.000"}
+        ]
+        
+        split_videos = {
+            0: ['/path/to/part0.mp4', 'gs://bucket/part0.mp4', 'Uploaded'],
+            1: ['/path/to/part1.mp4', 'gs://bucket/part1.mp4', 'Uploaded']
+        }
+    """
+    filter_complex_parts = []
+    video_stream_labels_for_concat = []
+    audio_stream_labels_for_concat = []
+    valid_segment_count = 0
+    
+    # Dictionary to track which split videos we need as inputs
+    required_inputs = {}
+    input_mapping = {}  # Maps part number to input index in ffmpeg command
+    input_counter = 0
+
+    # First pass: identify required input files and validate segments
+    for i, segment_info in enumerate(segments_data):
+        part_str = segment_info.get("part")
+        timestamp_str = segment_info.get("timestamp_relative")
+        
+        if part_str is None:
+            print(f"Warning: Segment {i+1} missing 'part' field. Skipping.")
+            continue
+            
+        if not timestamp_str:
+            print(f"Warning: Segment {i+1} missing 'timestamp_relative' field. Skipping.")
+            continue
+            
+        try:
+            part_index = int(part_str)
+        except ValueError:
+            print(f"Warning: Invalid part index '{part_str}' for segment {i+1}. Skipping.")
+            continue
+            
+        if part_index not in split_videos:
+            print(f"Warning: Part {part_index} not found in split_videos for segment {i+1}. Skipping.")
+            continue
+            
+        split_video_info = split_videos[part_index]
+        if not split_video_info or len(split_video_info) == 0:
+            print(f"Warning: No file path found for part {part_index} in segment {i+1}. Skipping.")
+            continue
+            
+        video_file_path = split_video_info[0]  # First element is the local file path
+        if not os.path.exists(video_file_path):
+            print(f"Warning: Video file '{video_file_path}' for part {part_index} not found. Skipping segment {i+1}.")
+            continue
+            
+        # Track this input if we haven't seen it before
+        if part_index not in required_inputs:
+            required_inputs[part_index] = video_file_path
+            input_mapping[part_index] = input_counter
+            input_counter += 1
+
+    if not required_inputs:
+        print("Error: No valid video segments found to process. Output video will not be created.")
+        return
+
+    # Build the ffmpeg input list
+    ffmpeg_inputs = []
+    for part_index in sorted(required_inputs.keys()):
+        ffmpeg_inputs.extend(['-i', required_inputs[part_index]])
+    
+    # Second pass: process segments and build filter complex
+    for i, segment_info in enumerate(segments_data):
+        part_str = segment_info.get("part")
+        timestamp_str = segment_info.get("timestamp_relative")
+        
+        if part_str is None or not timestamp_str:
+            continue
+            
+        try:
+            part_index = int(part_str)
+            if part_index not in split_videos or part_index not in input_mapping:
+                continue
+                
+            start_s, end_s = parse_timestamp_range(timestamp_str)
+        except (ValueError, KeyError) as e:
+            print(f"Warning: Could not process segment {i+1}. Error: {e}. Skipping.")
+            continue
+
+        input_index = input_mapping[part_index]
+        video_label = f"v{valid_segment_count}"
+        audio_label = f"a{valid_segment_count}"
+
+        # Trim video and audio for the current segment from the appropriate input
+        filter_complex_parts.append(f"[{input_index}:v]trim=start={start_s:.3f}:end={end_s:.3f},setpts=PTS-STARTPTS[{video_label}];")
+        filter_complex_parts.append(f"[{input_index}:a]atrim=start={start_s:.3f}:end={end_s:.3f},asetpts=PTS-STARTPTS[{audio_label}];")
+        
+        video_stream_labels_for_concat.append(f"[{video_label}]")
+        audio_stream_labels_for_concat.append(f"[{audio_label}]")
+        valid_segment_count += 1
+
+    if not valid_segment_count:
+        print("Error: No valid video segments were processed. Output video will not be created.")
+        return
+
+    # Build the concat filter string
+    concat_inputs_str = ""
+    for i in range(valid_segment_count):
+        concat_inputs_str += video_stream_labels_for_concat[i] + audio_stream_labels_for_concat[i]
+    
+    concat_filter_string = concat_inputs_str + f"concat=n={valid_segment_count}:v=1:a=1[outv][outa]"
+    
+    full_filter_complex = "".join(filter_complex_parts) + concat_filter_string
+    print("Filter complex:")
+    print(full_filter_complex)
+    
+    # Build the complete ffmpeg command
+    ffmpeg_command = [ffmpeg_path] + ffmpeg_inputs + [
+        '-filter_complex', full_filter_complex,
+        '-map', '[outv]',
+        '-map', '[outa]',
+        '-c:v', 'libx264', '-crf', '23', '-preset', 'medium',
+        '-c:a', 'aac', '-b:a', '192k',
+        output_video_path,
+        '-y' 
+    ]
+
+    print("Generated FFmpeg command:")
+    print(" ".join(shlex.quote(arg) for arg in ffmpeg_command))
+
+    try:
+        process = subprocess.run(ffmpeg_command, check=True, capture_output=True, text=True, encoding='utf-8')
+        print("\nFFmpeg process completed successfully.")
+        print(f"Output video saved to: {output_video_path}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"\nError during FFmpeg execution (return code {e.returncode}):")
+        print("FFmpeg Stderr:", e.stderr)
+        return False
+    except FileNotFoundError:
+        print(f"\nError: FFmpeg executable not found at '{ffmpeg_path}'. "
+              "Please ensure FFmpeg is installed and the path is correct.")
+        return False
+    except Exception as e:
+        print(f"\nAn unexpected error occurred: {e}")
+        return False
+
+
+# r = split_video_single_command(
+#     "/Users/oolongz/Desktop/project/gemini-analysis-frontend/src/data/video_8d615241875caaa91a4f33865a52fc60.mp4",  
+#     "gemini-oolongz",
+#     "tmp",
+#     60,
+#     True 
+# )
+
+# print(r)
+
+
+# segments_data = [{"剧情":"故事的开篇，我们看到了李保田的故乡——湖北。清晨的云雾缭绕着江边的城市和连绵的茶山，这里山清水秀，自古便是产茶胜地。这片土地不仅养育了李保田，也孕育了他家族世代相传的茶事业。","timestamp":"00:00:00.000-00:00:12.583","选取理由":"选择此片段作为故事的开端，通过壮丽的自然风光，建立主角李保田与故乡土地的深厚联系，点明其故事根植于湖北深厚的茶文化背景之中，为后续讲述其家族传承和事业奠定环境和情感基调。","part":"0","timestamp_relative":"00:00.000-00:12.583"},{"剧情":"李保田的家族世代制茶，他们遵循着古老的技艺。镜头中，我们看到李保田和他的师傅们，围在巨大的炒锅旁，用双手感知着温度，翻炒、揉捻着茶叶。这不仅仅是制茶，更是一种流传了千年的匠心与专注，是李保田家族的立身之本。","timestamp":"00:00:12.583-00:00:28.416","选取理由":"承接开篇的环境介绍，此片段具体展示了李保田家族的核心技艺——传统手工制茶。这不仅展现了茶文化的深度，也塑造了李保田作为传承人的“匠人”身份，为后续他坚守祖业、寻求突破埋下伏笔。","part":"0","timestamp_relative":"00:12.583-00:28.416"},{"剧情":"李保田时常会走上那条祖辈们走过的古道。青苔斑驳的石阶，记录着“万里茶道”的沧桑。他仿佛能看到几百年前，他的祖先牵着马匹，将家乡的茶叶一步步运往遥远的异国。那段旅途充满了艰辛，但也开启了家族的荣耀。","timestamp":"00:01:14.033-00:01:24.533","选取理由":"将故事从当下拉回历史，通过“万里茶道”的意象，揭示李保田家族辉煌的过去。这为李保田的人物增添了历史厚重感，也解释了他内心深处那份想要重振家族荣光的使命感，是故事的核心情感驱动力。","part":"1","timestamp_relative":"00:14.033-00:24.533"},{"剧情":"这就是李保田家族世代制作的青砖茶，也是当年祖辈们行销万里的骄傲。他轻轻抚摸着这块压制紧实的茶砖，感受着其中蕴含的岁月与汗水。对于李保田来说，这块茶不仅仅是商品，更是家族历史的见证和精神的载体。","timestamp":"00:01:24.533-00:01:28.833","选取理由":"在宏大的历史叙事后，用一个特写镜头聚焦于核心物品“青砖茶”。这使得故事的载体变得具体、可感。它既是连接过去与现在的纽带，也是后续“羊来茶往”故事的关键物品，起到了承上启下的作用。","part":"1","timestamp_relative":"00:24.533-00:28.833"},{"剧情":"时光流转，历史的机遇悄然而至。为了感谢蒙古国捐赠三万只羊的情谊，国家决定回赠一批湖北的特色茶叶。李保田家族制作的赤壁青砖茶，因其深厚的历史底蕴和卓越的品质而被选中。这一刻，李保田意识到，他的茶将承载着新的使命，踏上一条新的“茶道”。","timestamp":"00:01:48.066-00:02:00.099","选取理由":"这是故事的转折点和高潮。将李保田的个人奋斗与重大的国家叙事结合起来，极大地提升了故事的格局。他家族的茶叶被选中，不仅是对其品质的认可，也让他个人的传承使命与国家间的友好交流联系在了一起，完成了人物弧光的升华。","part":"1","timestamp_relative":"00:48.066-01:00.099"},{"剧情":"最终，李保田的故事达到了顶点。“羊来茶往”的佳话，让古老的“万里茶道”在新时代焕发了新的光彩。它不再仅仅是一条商业贸易之路，更成为了一条跨越国界的友谊之路。李保田站在故乡的山水间，他知道，自己不仅继承了祖辈的技艺，更将这份承载着友谊与和平的茶香，传向了更远的地方。","timestamp":"00:02:01.800-00:02:06.500","选取理由":"作为故事的结尾，此片段用宏大的视听语言和明确的字幕，为李保田的故事赋予了崇高的意义。将“羊来茶往”定义为新时代的“万里茶道”，完美呼应了前文的历史铺垫，使李保田的个人奋斗史最终汇入时代洪流，完成了故事的闭环，留下了悠远的回味。","part":"2","timestamp_relative":"00:01.800-00:06.500"}]
+# split_videos = {0: ['/Users/oolongz/Desktop/project/gemini-analysis-frontend/src/data/video_6aed61cd2819e654adbdd76d7f2e72a1_60_part_0.mp4', 'gs://gemini-oolongz/movie-demo-part/video_6aed61cd2819e654adbdd76d7f2e72a1_60_part_0.mp4', 'Uploaded'], 1: ['/Users/oolongz/Desktop/project/gemini-analysis-frontend/src/data/video_6aed61cd2819e654adbdd76d7f2e72a1_60_part_1.mp4', 'gs://gemini-oolongz/movie-demo-part/video_6aed61cd2819e654adbdd76d7f2e72a1_60_part_1.mp4', 'Uploaded'], 2: ['/Users/oolongz/Desktop/project/gemini-analysis-frontend/src/data/video_6aed61cd2819e654adbdd76d7f2e72a1_60_part_2.mp4', 'gs://gemini-oolongz/movie-demo-part/video_6aed61cd2819e654adbdd76d7f2e72a1_60_part_2.mp4', 'Uploaded']}
+# output_video_path = "/tmp/output.mp4"
+# create_stitched_video_from_data_v2(segments_data, split_videos, output_video_path)

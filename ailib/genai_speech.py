@@ -1,29 +1,67 @@
 import requests, os, json, base64
+#ffmpeg -i input.aifc -acodec pcm_s16le -ac 1 -ar 24000 output.wav
+#http://sherlog/_1MCNt6KPaQ 
 import binascii
-import streamlit as st
+import google.auth
+import google.auth.transport.requests
 from google.api_core.client_options import ClientOptions
 from google.cloud import texttospeech_v1beta1 as texttospeech
 from google.oauth2 import service_account
+from ailib.env_config import (
+    SA_KEY_FILE_PATH, 
+    SPEECH_AUTH_TYPE,
+    MINIMAX_GROUP_ID,
+    MINIMAX_API_KEY
+)
 import streamlit as st
 
-
 def get_speech_client():
-    file_path = st.secrets["SA_KEY_FILE_PATH"]
+    """
+    创建通用的 Text-to-Speech 客户端
+    根据 SPEECH_AUTH_TYPE 配置选择认证方式:
+    - SA: 使用服务账户认证
+    - 其他: 使用默认认证 (ADC)
+    """
     credentials = None
-    if os.path.exists(file_path):
-        credentials = service_account.Credentials.from_service_account_file(file_path, scopes=['https://www.googleapis.com/auth/cloud-platform'])
-    else:
-        print(f"路径 '{file_path}' 不存在。")
     
-    hdvoice_client = texttospeech.TextToSpeechClient(
+    if SPEECH_AUTH_TYPE == "SA":
+        if SA_KEY_FILE_PATH and os.path.exists(SA_KEY_FILE_PATH):
+            credentials = service_account.Credentials.from_service_account_file(
+                SA_KEY_FILE_PATH, 
+                scopes=['https://www.googleapis.com/auth/cloud-platform']
+            )
+        else:
+            print(f"警告: SA 认证模式但服务账户文件不存在: {SA_KEY_FILE_PATH}")
+            print("回退到默认认证模式")
+    
+    return texttospeech.TextToSpeechClient(
         client_options=ClientOptions(api_endpoint="texttospeech.googleapis.com"),
         credentials=credentials
     )
-    return hdvoice_client
 
 
-def create_instant_custom_voice_key( project_id, reference_audio_bytes, consent_audio_bytes, language_code="en-US"
-):
+def get_token():
+    """
+    获取访问令牌
+    根据 SPEECH_AUTH_TYPE 配置选择认证方式
+    """
+    if SPEECH_AUTH_TYPE == "SA" and SA_KEY_FILE_PATH and os.path.exists(SA_KEY_FILE_PATH):
+        credentials = service_account.Credentials.from_service_account_file(
+            SA_KEY_FILE_PATH, 
+            scopes=['https://www.googleapis.com/auth/cloud-platform']
+        )
+    else:
+        credentials, _ = google.auth.default()
+    
+    # 刷新访问令牌
+    request = google.auth.transport.requests.Request()
+    credentials.refresh(request)
+    # 获取访问令牌
+    access_token = credentials.token
+    return access_token
+
+
+def create_instant_custom_voice_key( project_id, reference_audio_bytes, consent_audio_bytes, language_code="en-US"):
     access_token = get_token()
     url = "https://texttospeech.googleapis.com/v1beta1/voices:generateVoiceCloningKey"
   
@@ -57,9 +95,6 @@ def create_instant_custom_voice_key( project_id, reference_audio_bytes, consent_
     response_json = response.json()
     
     return response_json.get("voiceCloningKey")
-
-import requests, os, json, base64
-from IPython.display import Audio, display
 
 
 def synthesize_text_with_cloned_voice(project_id, voice_key, text, audio_file_path= "output.wav", language_code="cmn-CN"):
@@ -135,22 +170,28 @@ def read_audio_file_as_bytes(file_path):
     except Exception as e:
         print(f"读取音频文件时发生错误: {e}")
         return None
-    
-import google.auth
-import google.auth.transport.requests
-def get_token():
-    credentials, _ = google.auth.default()
-    # 刷新访问令牌
-    request = google.auth.transport.requests.Request()
-    credentials.refresh(request)
-    # 获取访问令牌
-    access_token = credentials.token
-    return access_token
 
-import requests
-def callMiniMax(text,voice_id = "jiangwen",  audio_file_path= "output.wav", speed = 1.16, pitch = 0, vol = 1.33):
-    group_id= st.secrets["minimax_group_id"]
-    api_key = st.secrets["minimax_api_key"]
+
+def callMiniMax(text, voice_id="jiangwen", audio_file_path="output.wav", speed=1.16, pitch=0, vol=1.33):
+    """
+    调用 MiniMax TTS API
+    使用 env_config 中的配置而不是 streamlit session state
+    """
+    group_id = MINIMAX_GROUP_ID
+    api_key = MINIMAX_API_KEY
+
+    if not group_id:
+        group_id = st.session_state["minimax_group_id"]
+
+    if not api_key:
+        api_key = st.session_state["minimax_api_key"]
+
+    print(f"minimax api_key{api_key} group_id{group_id}")
+
+    if not group_id or not api_key:
+        print("请在环境变量中配置 MINIMAX_GROUP_ID 和 MINIMAX_API_KEY")
+        return
+
     url = f"https://api.minimax.chat/v1/t2a_v2?GroupId={group_id}"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -158,37 +199,37 @@ def callMiniMax(text,voice_id = "jiangwen",  audio_file_path= "output.wav", spee
     }
     
     payload = {
-    "model": "speech-02-hd",
-    "text": text,
-    "timber_weights": [
-        {
-        "voice_id": voice_id,
-        "weight": 1
-        }
-    ],
-    "voice_setting": {
-        "voice_id": voice_id,
-        "speed": speed,
-        "pitch": pitch,
-        "vol": vol,
-        "latex_read": False
-    },
-    "audio_setting": {
-        "sample_rate": 32000,
-        "bitrate": 128000,
-        "format": "mp3"
-    },
-    "language_boost": "auto"
+        "model": "speech-02-hd",
+        "text": text,
+        "timber_weights": [
+            {
+                "voice_id": voice_id,
+                "weight": 1
+            }
+        ],
+        "voice_setting": {
+            "voice_id": voice_id,
+            "speed": speed,
+            "pitch": pitch,
+            "vol": vol,
+            "latex_read": False
+        },
+        "audio_setting": {
+            "sample_rate": 32000,
+            "bitrate": 128000,
+            "format": "mp3"
+        },
+        "language_boost": "auto"
     }
 
     response = requests.post(url, headers=headers, json=payload)
 
-    json_data = json.loads(response.text,strict=False)
-    try : 
+    json_data = json.loads(response.text, strict=False)
+    try:
         content = json_data["data"]["audio"]
         if content:
             audio_bytes = binascii.unhexlify(content)
-
+            # save audio content to a file
             with open(audio_file_path, "wb") as audio_file:
                 audio_file.write(audio_bytes)
             print(f"Audio content saved to {audio_file_path}")
@@ -199,10 +240,16 @@ def callMiniMax(text,voice_id = "jiangwen",  audio_file_path= "output.wav", spee
         print(f"Error: {e}")
         print(json_data)
 
-def synthesize_text_with_hd_voice(text, voice = "voice", audio_file_path= "output.wav", language_code="en-US", speaking_rate = 1.4):
-    
-    hdvoice_client = get_speech_client()
 
+# 创建通用客户端实例
+hdvoice_client = get_speech_client()
+
+
+def synthesize_text_with_hd_voice(text, voice="voice", audio_file_path="output.wav", language_code="en-US", speaking_rate=1.4):
+    """
+    使用 HD 语音合成文本
+    使用通用客户端实例
+    """
     voice_name = f"{language_code}-Chirp3-HD-{voice}"
     voice = texttospeech.VoiceSelectionParams(
         name=voice_name,
@@ -215,9 +262,8 @@ def synthesize_text_with_hd_voice(text, voice = "voice", audio_file_path= "outpu
         # Select the type of audio file you want returned
         audio_config=texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate= speaking_rate,
+            speaking_rate=speaking_rate,
             sample_rate_hertz=24000,
-
         ),
     )
 
@@ -225,9 +271,16 @@ def synthesize_text_with_hd_voice(text, voice = "voice", audio_file_path= "outpu
         out.write(response.audio_content)
         print(f"Audio content saved to {audio_file_path}")
 
+
+# 使用示例 (注释掉避免意外执行)
 # synthesize_text_with_hd_voice(
 #     text="Once upon a time, there was a cute cat. He was so cute that he got lots of treats.",
 #     voice="Algenib",
-#     audio_file_path= "output.wav", 
+#     audio_file_path="output.wav", 
 #     language_code="en-US"
 # )
+
+# from ailib.voice_keys import voice_clone_keys
+# print(voice_clone_keys["jiangwen"])
+# synthesize_text_with_cloned_voice("cloud-llm-preview1", voice_clone_keys["jiangwen"], "阿尔弗雷德巧妙地问布鲁斯是对丹特的品格感兴趣，然后他深情地握住瑞秋的手，蝙蝠侠从撞击中恢复过来。他迅速跑上停车场的坡道，从高处跃下，展开披风滑翔，猛地降落在货车车顶，砸碎了挡风玻璃，制服了稻草人", audio_file_path="output.wav", language_code="cmn-CN")
+# callMiniMax("你好，我是老姜", voice_id="jiangwen", audio_file_path="output.wav", speed=1.16, pitch=0, vol=1.33)

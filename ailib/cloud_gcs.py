@@ -1,27 +1,44 @@
 import os
+from pathlib import Path
+from typing import List, Dict
+import concurrent.futures
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
 from google.oauth2 import service_account
-import streamlit as st
-import os
+from ailib.env_config import GCS_PROJECT_ID, SA_KEY_FILE_PATH, GCS_AUTH_TYPE
 
-def init_storage_client():
-    project_id = st.secrets["PROJECT_ID"]
+def _get_gcs_credentials():
+    """
+    根据 GCS_AUTH_TYPE 获取 GCS 凭据
+    """
     credentials = None
-    sa_file_path = st.secrets["SA_KEY_FILE_PATH"]
-    auth_type = st.secrets["AUTH_TYPE"]
-
-    if auth_type == "SA" and os.path.exists(sa_file_path):
-        credentials = service_account.Credentials.from_service_account_file(sa_file_path, scopes=['https://www.googleapis.com/auth/cloud-platform'])
+    if GCS_AUTH_TYPE == "SA":
+        if SA_KEY_FILE_PATH and os.path.exists(SA_KEY_FILE_PATH):
+            credentials = service_account.Credentials.from_service_account_file(
+                SA_KEY_FILE_PATH, 
+                scopes=['https://www.googleapis.com/auth/cloud-platform']
+            )
+        else:
+            print(f"警告: GCS SA 认证模式但服务账户文件不存在: {SA_KEY_FILE_PATH}")
+            print("回退到默认认证模式 (ADC)")
     else:
-        print(f"auth_type:{auth_type} is not SA or sa key file 路径 '{sa_file_path}' 不存在。 Auth by ADC")
+        print(f"GCS 使用默认认证模式 (ADC)")
+    
+    return credentials
+
+def init_client():
+    """
+    初始化 GCS 客户端
+    根据 GCS_PROJECT_ID 和 GCS_AUTH_TYPE 配置
+    """
+    project_id = GCS_PROJECT_ID
+    credentials = _get_gcs_credentials()
     
     storage_client = storage.Client(
-        project= project_id,
+        project=project_id,
         credentials=credentials
     )
     return storage_client
-
 
 def download_gcs_object(gcs_uri: str, local_destination_path: str = None) -> bool:
     """
@@ -40,9 +57,6 @@ def download_gcs_object(gcs_uri: str, local_destination_path: str = None) -> boo
         return False
 
     try:
-        # 初始化 GCS 客户端
-        storage_client = init_storage_client()
-        
         # 解析 GCS URI
         path_parts = gcs_uri[5:].split("/", 1)
         if len(path_parts) < 2 or not path_parts[0] or not path_parts[1]:
@@ -57,6 +71,9 @@ def download_gcs_object(gcs_uri: str, local_destination_path: str = None) -> boo
         if blob_name.endswith('/'):
             print(f"错误：对象路径 '{blob_name}' 看起来像一个目录。请指定一个具体的文件对象。")
             return False
+
+        # 初始化 GCS 客户端
+        storage_client = init_client()
 
         # 获取 bucket 和 blob
         bucket = storage_client.bucket(bucket_name)
@@ -93,7 +110,7 @@ def download_gcs_object(gcs_uri: str, local_destination_path: str = None) -> boo
 def upload_gcs_object(bucket_name, destination_blob_name, source_file_name) -> bool:
     try:
         # 初始化 GCS 客户端
-        storage_client = init_storage_client()
+        storage_client = init_client()
 
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(destination_blob_name)
@@ -117,21 +134,93 @@ def upload_gcs_object(bucket_name, destination_blob_name, source_file_name) -> b
         return False
 
 def blob_metadata(bucket_name, blob_name):
-    print(bucket_name, blob_name)
-    
     # 初始化 GCS 客户端
-    storage_client = init_storage_client()
-    
+    storage_client = init_client()
     bucket = storage_client.bucket(bucket_name)
+    
     # Retrieve a blob, and its metadata, from Google Cloud Storage.
     # Note that `get_blob` differs from `Bucket.blob`, which does not
     # make an HTTP request.
     blob = bucket.get_blob(blob_name)
     return blob
 
+
+def _upload_task(local_file: str, bucket: storage.Bucket, gcs_path: str):
+    """
+    单个文件的上传任务，用于在线程池中执行。
+
+    :return: 一个元组 (local_file, status_message)
+    """
+    try:
+        file_name = Path(local_file).name
+        # 拼接在 GCS 中的完整对象路径
+        # 例如: 'videos/my_project/filename_part_1.mp4'
+        object_name = f"{gcs_path}/{file_name}" if gcs_path else file_name
+        object_gcs_name = f"gs://{bucket.name}/{object_name}"
+        blob = bucket.blob(object_name)
+        # 1. 判断文件是否已存在
+        if blob.exists():
+            status = "Skipped: Already exists"
+            print(f"⏭️ {file_name}: {status}")
+            return local_file, object_gcs_name, status
+
+        # 2. 如果不存在，则上传
+        print(f"🔼 {file_name}: Uploading...")
+        blob.upload_from_filename(local_file)
+        status = "Uploaded"
+        print(f"✅ {file_name}: {status}")
+        return local_file, object_gcs_name, status
+
+    except Exception as e:
+        status = f"Failed: {e}"
+        print(f"❌ {file_name}: {status}")
+        return local_file, "", status
+
+
+def upload_parts_to_gcs_parallel(
+    local_files: List[str], 
+    bucket_name: str, 
+    object_path: str, 
+    max_workers: int = 8
+) -> Dict[str, List[str]]:
+    """
+    并行地将一系列本地文件上传到 Google Cloud Storage。
+
+    :param local_files: 要上传的本地文件路径列表。
+    :param bucket_name: GCS 存储桶的名称。
+    :param object_path: 文件在存储桶中存放的路径（"文件夹"）。
+    :param max_workers: 并行上传的最大线程数。
+    :return: 一个字典，键是本地文件路径，值是上传状态。
+    """
+   
+    storage_client = init_client()
+    bucket = storage_client.bucket(bucket_name)
+    upload_results = {}
+    
+    # 使用线程池执行并行上传
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 提交所有上传任务
+        future_to_file = {
+            executor.submit(_upload_task, local_file, bucket, object_path): local_file 
+            for local_file in local_files
+        }
+        
+        print(f"\n--- 开始并行上传到 GCS Bucket: gs://{bucket_name}/{object_path} ---")
+        
+        # 等待任务完成并收集结果
+        for future in concurrent.futures.as_completed(future_to_file):
+            try:
+                file_path, object_name, status = future.result()
+                upload_results[file_path] = [file_path, object_name, status]
+            except Exception as e:
+                # 一般 _upload_task 内部会捕获异常，这里作为最后的保障
+                file_path = future_to_file[future]
+                upload_results[file_path] = [file_path, object_name, f"Failed in executor: {e}"]
+    
+    return upload_results
+
+
 # bucket_name = "gemini-oolongz"
-# blob_name = "y"
+# blob_name = "movie_metadata.txt"
 # blob = blob_metadata(bucket_name, blob_name)
 # print(blob)
-# download_gcs_object("gs://gemini-oolongz/c", "c")
-# upload_gcs_object("gemini-oolongz","c-copy", "c")

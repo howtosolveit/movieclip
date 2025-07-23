@@ -6,38 +6,138 @@ from google import genai
 from google.genai.types import Part
 import json
 from ailib import file
-import streamlit as st
+from ailib.env_config import (
+    SA_KEY_FILE_PATH, 
+    GEMINI_TIMEOUT,
+    GEMINI_AUTH_TYPE,
+    IMAGE_AUTH_TYPE,
+    VIDEO_AUTH_TYPE,
+    API_KEY,
+    PROXY
+)
 import os
 
+# 
+# AIS : 
+# 1 不支持audio_timestamp
+# 2 不支持gcs
+#
 
-def get_gemini_client(project_id, location):
+def _get_credentials(auth_type):
+    """
+    根据认证类型获取凭据
+    auth_type: SA 或 ADC
+    """
     credentials = None
-    sa_file_path = st.secrets["SA_KEY_FILE_PATH"]
-    auth_type = st.secrets["AUTH_TYPE"]
+    if auth_type == "SA":
+        if SA_KEY_FILE_PATH and os.path.exists(SA_KEY_FILE_PATH):
+            credentials = service_account.Credentials.from_service_account_file(
+                SA_KEY_FILE_PATH, 
+                scopes=['https://www.googleapis.com/auth/cloud-platform']
+            )
+        else:
+            print(f"警告: SA 认证模式但服务账户文件不存在: {SA_KEY_FILE_PATH}")
+            print("回退到默认认证模式 (ADC)")
 
-    if auth_type == "SA" and os.path.exists(sa_file_path):
-        credentials = service_account.Credentials.from_service_account_file(sa_file_path, scopes=['https://www.googleapis.com/auth/cloud-platform'])
+    return credentials
+
+
+def init_gemini_client(project_id, location, gemini_auth_type=None):
+    """
+    初始化 Gemini 客户端
+    根据 GEMINI_AUTH_TYPE 选择认证方式
+    """
+
+    if not gemini_auth_type:
+        gemini_auth_type = GEMINI_AUTH_TYPE
+
+    credentials = _get_credentials(gemini_auth_type)
+    
+    http_options = {}
+    if GEMINI_TIMEOUT > 0:
+        http_options["timeout"]= GEMINI_TIMEOUT
+            
+    if PROXY  :
+        http_options["client_args"] = {'proxy': PROXY}
+
+    print("http_options")
+    print(http_options)
+    if gemini_auth_type == "SA":
+        print("init vertex ai client by sa key")
+        client = genai.Client(
+            vertexai=True,
+            project=project_id,
+            location=location,
+            credentials=credentials,
+            http_options=http_options
+        )
+    elif gemini_auth_type == "AIS_API_KEY":
+        print("init ai studio client")
+        client = genai.Client(
+            api_key= API_KEY,
+            http_options=http_options
+        )
+    elif gemini_auth_type == "ADC":
+        print("init vertex ai client by adc")
+        client = genai.Client(
+            vertexai=True,
+            project=project_id,
+            location=location,
+            http_options=http_options
+        )
     else:
-        print(f"sa key file 路径 '{sa_file_path}' 不存在。")
+        pass
 
-    return genai.Client(
+    return client
+
+
+def init_imagen_client(project_id, location):
+    """
+    初始化 Imagen 客户端
+    根据 IMAGE_AUTH_TYPE 选择认证方式
+    """
+    credentials = _get_credentials(IMAGE_AUTH_TYPE)
+
+    client = genai.Client(
         vertexai=True,
         project=project_id,
         location=location,
-        credentials=credentials,
+        credentials=credentials
     )
-   
-
-async def asyncCallapi(project_id, location, model, files=[], textInputs=[], videoLinks=[], imageLinks=[], generation_config_params={},links=[]):
     
-    client = get_gemini_client(project_id, location)
+    return client
 
+
+def init_veo_client(project_id, location):
+    """
+    初始化 Veo 客户端
+    根据 VIDEO_AUTH_TYPE 选择认证方式
+    """
+    credentials = _get_credentials(VIDEO_AUTH_TYPE)
+
+    client = genai.Client(
+        vertexai=True,
+        project=project_id,
+        location=location,
+        credentials=credentials
+    )
+    
+    return client
+
+
+# 保持向后兼容性的旧函数，默认使用 Gemini 客户端
+def init_client(project_id, location, gemini_auth_type = None):
+    """
+    @deprecated 请使用 init_gemini_client, init_imagen_client, 或 init_veo_client
+    """
+    return init_gemini_client(project_id, location, gemini_auth_type)
+
+async def asyncCallapi(project_id, location, model, files=[], textInputs=[], videoLinks=[], imageLinks=[], generation_config_params={},links=[], gemini_auth_type = None):
+    client = init_gemini_client(project_id, location, gemini_auth_type)
+    
     prompt = prepareGeminiMessages(files=files, textInputs=textInputs, videoLinks=videoLinks, imageLinks=imageLinks, links=links)
-    
     generate_content_config = prepareGeminiConfig(generation_config_params)
-    
     desc = ""
-   
     try:
         start_time = time.time()
         responses =  await client.aio.models.generate_content(
@@ -46,6 +146,7 @@ async def asyncCallapi(project_id, location, model, files=[], textInputs=[], vid
                 config= generate_content_config,
 
         )
+       
         end_time = time.time()
         elapsed_time = end_time - start_time
         desc =  f"""{model}
@@ -62,16 +163,13 @@ total_token_count={responses.usage_metadata.total_token_count}
         return [{"error":str(e),"model":model},"error happens",model,"fail"]
 
 
-def callapi(project_id, location, model, files=[], textInputs=[], videoLinks=[], imageLinks=[], generation_config_params={}, is_async = False, links=[]):
-
-    client = get_gemini_client(project_id, location)
-
-    prompt = prepareGeminiMessages(files=files, textInputs=textInputs, videoLinks=videoLinks, imageLinks=imageLinks,links=links)
-
-    generate_content_config = prepareGeminiConfig(generation_config_params)
-
-    desc = ""
+def callapi(project_id, location, model, files=[], textInputs=[], videoLinks=[], imageLinks=[], generation_config_params={}, is_async = False, links=[], gemini_auth_type = None):
+    client = init_gemini_client(project_id, location, gemini_auth_type)
     
+    prompt = prepareGeminiMessages(files=files, textInputs=textInputs, videoLinks=videoLinks, imageLinks=imageLinks,links=links)
+    generate_content_config = prepareGeminiConfig(generation_config_params)
+    print(generate_content_config)
+    desc = ""
     try:
         start_time = time.time()
         if is_async:
@@ -127,9 +225,12 @@ def prepareGeminiConfig(params):
         ),types.SafetySetting(
             category="HARM_CATEGORY_HARASSMENT",
             threshold="OFF"
-        )],
-        audio_timestamp= audio_timestamp
+        )]
     )
+
+    if audio_timestamp:
+        generation_config.audio_timestamp = audio_timestamp
+   
     #Parameter response_mime_type is not supported for generating image response
     if response_modalities == ["TEXT"] and response_mime_type:
         generation_config.response_mime_type = response_mime_type
@@ -258,9 +359,8 @@ def convert_markdown_to_json(markdown_str):
         json_data = json.loads(json_str,strict=False)
         return json_data
     except json.JSONDecodeError as e:
-        print(f"JSON解码错误: {e}")
-        print(json_str)
-        return None
+        print(f"JSON解码错误: {e} ori str:{json_str}")
+        return json_str
 
 # grounding search 在application/json中会返回非预期数据。
 def remove_srt_format(markdown_str):
@@ -286,14 +386,15 @@ def remove_srt_format(markdown_str):
 
 
 async def gene_iamge(project_id = None, location = None, model = None, config = None, prompt =None):
-    client = get_gemini_client(project_id, location)
+    client = init_imagen_client(project_id, location)
+
     print(project_id , location, model, config, prompt)
 
     responses =  await client.aio.models.generate_images(model=model,config=config,prompt=prompt)
     return responses
 
 def gene_video(project_id, location,veo_output_gcs_location, veo_params):
-    client = get_gemini_client(project_id, location)
+    client = init_veo_client(project_id, location)
 
     number_of_videos =  veo_params.get("veo_count",2) 
     fps =  veo_params.get("veo_fps",24)  
@@ -362,4 +463,17 @@ def gene_video(project_id, location,veo_output_gcs_location, veo_params):
             error.append(operation.result.rai_media_filtered_reasons)
     return error, veo_result
 
-# print(callapi("oolongz-0410", "us-central1", "gemini-2.5-pro", files=[], textInputs=["how do you do"], videoLinks=[], imageLinks=[], generation_config_params={}, is_async = False, links=[]))
+###### 测试代码示例 (注释掉避免意外执行)
+
+# project_id="oolongz-0410"
+# location ="us-central1"
+# veo_output_gcs_location = "gs://gemini-oolongz/veo/"
+# veo_params = {
+#     "prompt":"a dog"
+# }
+# print(callapi(project_id, location, "gemini-2.0-flash-001", files=[], textInputs=["how do you do"], videoLinks=[], imageLinks=[], generation_config_params={}, is_async = False, links=[]))
+# print(gene_video(veo_project_id, location,veo_output_gcs_location, veo_params))
+# 对于 async 函数，需要在 async 环境中调用:
+# import asyncio
+# result = asyncio.run(gene_iamge(project_id, location, "imagen-3.0-generate-001", None , "a dog"))
+# print(result)
