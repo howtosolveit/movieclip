@@ -38,7 +38,7 @@ MovieClip是一个基于AI的智能视频处理系统，能够自动分析视频
 - **语音合成**: Google Cloud Text-to-Speech, MiniMax TTS
 - **视频处理**: FFmpeg/FFprobe
 - **云存储**: Google Cloud Storage
-- **编程语言**: Python 3.8+
+- **编程语言**: Python 3.11.2+
 
 ### 主要模块
 
