@@ -31,3 +31,6 @@ rembg
 onnxruntime
 python-magic
 google-adk
+fastapi
+uvicorn
+python-multipart
