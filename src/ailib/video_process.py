@@ -383,7 +383,13 @@ def mix_narrations_with_video_audio(
     ffmpeg_command.extend([
         '-map', '0:v',            # Map video from the first input (stitched_video_path)
         '-map', final_audio_map_label, # Map the processed audio
-        '-c:v', 'copy',           # Copy video stream without re-encoding (as per example)
+        '-c:v', 'libx264',        # Re-encode video for web compatibility
+        '-preset', 'medium',      # Balanced encoding speed vs quality
+        '-crf', '23',             # Constant rate factor for good quality
+        '-pix_fmt', 'yuv420p',    # Ensure compatible pixel format
+        '-movflags', 'faststart', # Put metadata at beginning for web streaming
+        '-g', '90',               # Set keyframe interval (3 seconds at 30fps)
+        '-keyint_min', '30',      # Minimum keyframe interval
         '-c:a', 'aac',            # Encode audio to AAC
         '-b:a', '192k',           # Audio bitrate 192k
         final_output_path,
@@ -831,7 +837,12 @@ def create_stitched_video_from_data_v2(segments_data, split_videos, output_video
         '-filter_complex', full_filter_complex,
         '-map', '[outv]',
         '-map', '[outa]',
+        # Web-optimized encoding parameters for better browser compatibility
         '-c:v', 'libx264', '-crf', '23', '-preset', 'medium',
+        '-pix_fmt', 'yuv420p',    # Ensure compatible pixel format
+        '-movflags', 'faststart', # Put metadata at beginning for web streaming
+        '-g', '90',               # Set keyframe interval (3 seconds at 30fps)
+        '-keyint_min', '30',      # Minimum keyframe interval
         '-c:a', 'aac', '-b:a', '192k',
         output_video_path,
         '-y' 
