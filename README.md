@@ -118,17 +118,16 @@ source venv/bin/activate  # Linux/macOS
 # 或者 venv\Scripts\activate  # Windows
 
 # 安装 Python 依赖
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # 配置环境变量
-cp ../.env.example .env
 # 编辑 .env 文件，填入必要的配置项：
 # - Google Cloud 项目 ID
 # - 服务账号密钥路径
 # - 其他 API 密钥
 
 # 启动后端服务
-python main.py
+cd src && python3 -m  backend.main
 ```
 
 后端服务将在 `http://localhost:8000` 启动，API文档可访问 `http://localhost:8000/docs`
@@ -137,7 +136,7 @@ python main.py
 
 ```bash
 # 新开终端，进入前端目录
-cd frontend
+cd src/frontend
 
 # 安装 Node.js 依赖
 npm install
