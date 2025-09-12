@@ -1,6 +1,6 @@
 export default {
   // Main title and header
-  title: 'Film Editing Studio',
+  title: 'Movie Highlight Workflow',
   poweredBy: '⭐ Powered by {model} ⭐',
   
   // Navigation and steps

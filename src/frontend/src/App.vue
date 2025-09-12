@@ -20,7 +20,7 @@
       <div class="content-area">
         <!-- Operations Section -->
         <el-card class="section-card operations-card" shadow="hover">
-          <template #header>
+          <!-- <template #header> -->
             <div class="section-header-unified">
               <div class="header-left">
                 <el-icon class="section-icon"><Operation /></el-icon>
@@ -28,7 +28,7 @@
                 <span class="section-subtitle">{{ $t('operationSuggestion') }}</span>
               </div>
             </div>
-          </template>
+          <!-- </template> -->
 
           <div class="operations-grid">
             <el-row :gutter="20">
@@ -1546,11 +1546,11 @@ export default {
   backdrop-filter: blur(20px);
 }
 
-/* Operations card with black background */
+/* Operations card - remove card styling */
 .operations-card {
-  background: #000000 !important;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .section-card::before {
@@ -1649,7 +1649,8 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -1661,6 +1662,63 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   letter-spacing: 0.8px;
+  text-align: center;
+  padding: 8px 12px;
+  line-height: 1.2;
+  white-space: normal;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Enhanced responsive text sizing for different languages */
+.operation-btn {
+  font-size: clamp(13px, 2.5vw, 16px);
+}
+
+/* Specific adjustments for longer English text */
+@media (max-width: 1400px) {
+  .operation-btn {
+    font-size: clamp(12px, 2.2vw, 14px);
+    padding: 10px 8px;
+    height: 76px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .operation-btn {
+    font-size: clamp(11px, 2vw, 13px);
+    height: 80px;
+    padding: 12px 6px;
+  }
+}
+
+@media (max-width: 992px) {
+  .operation-btn {
+    font-size: clamp(10px, 1.8vw, 12px);
+    height: 84px;
+    padding: 14px 4px;
+  }
+}
+
+/* Language-specific adjustments using CSS attribute selectors */
+[lang="en"] .operation-btn {
+  font-size: clamp(11px, 2.2vw, 14px);
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+}
+
+[lang="zh"] .operation-btn {
+  font-size: clamp(13px, 2.5vw, 16px);
+  letter-spacing: 0.8px;
+  line-height: 1.2;
+}
+
+/* Dynamic height adjustment for text overflow */
+.operation-btn span {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .operation-btn::before {
@@ -1689,62 +1747,62 @@ export default {
 }
 
 .operation-btn.step1 {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  color: #495057;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border: 1px solid #2196f3;
+  color: #1565c0;
   font-weight: 500;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
 }
 
 .operation-btn.step1:hover:not(:disabled) {
-  background: #f8f9fa;
-  border-color: #007bff;
+  background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
+  border-color: #1976d2;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);
 }
 
 .operation-btn.step2 {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  color: #495057;
+  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+  border: 1px solid #4caf50;
+  color: #2e7d32;
   font-weight: 500;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
 }
 
 .operation-btn.step2:hover:not(:disabled) {
-  background: #f8f9fa;
-  border-color: #007bff;
+  background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+  border-color: #388e3c;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
 }
 
 .operation-btn.step3 {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  color: #495057;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);
+  border: 1px solid #ff9800;
+  color: #ef6c00;
   font-weight: 500;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
 }
 
 .operation-btn.step3:hover:not(:disabled) {
-  background: #f8f9fa;
-  border-color: #007bff;
+  background: linear-gradient(135deg, #ffcc02 0%, #ffb300 100%);
+  border-color: #f57c00;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 16px rgba(255, 152, 0, 0.3);
 }
 
 .operation-btn.step4 {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  color: #495057;
+  background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+  border: 1px solid #e91e63;
+  color: #ad1457;
   font-weight: 500;
+  box-shadow: 0 4px 12px rgba(233, 30, 99, 0.2);
 }
 
 .operation-btn.step4:hover:not(:disabled) {
-  background: #f8f9fa;
-  border-color: #007bff;
+  background: linear-gradient(135deg, #f8bbd9 0%, #f48fb1 100%);
+  border-color: #c2185b;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-@keyframes coinSpin {
   0% { transform: rotateY(0deg); }
   100% { transform: rotateY(360deg); }
 }
