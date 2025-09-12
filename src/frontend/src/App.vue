@@ -6,11 +6,14 @@
       <div class="main-title-section">
         <div class="title-content">
           <h1 class="main-title mario-title">
-            🍄 超级玛丽剪辑工作室 🍄
+            {{ $t('title') }}
             <span v-if="selectedModel" class="model-info-inline mario-power">
-              ⭐ Powered by {{ selectedModel }} ⭐
+              {{ $t('poweredBy', { model: selectedModel }) }}
             </span>
           </h1>
+          <div class="title-actions">
+            <LanguageSwitcher />
+          </div>
         </div>
       </div>
       <!-- Content Area -->
@@ -18,9 +21,12 @@
         <!-- Operations Section -->
         <el-card class="section-card operations-card" shadow="hover">
           <template #header>
-            <div class="section-header">
-              <el-icon class="section-icon"><Operation /></el-icon>
-              <span class="section-title">操作步骤</span>
+            <div class="section-header-unified">
+              <div class="header-left">
+                <el-icon class="section-icon"><Operation /></el-icon>
+                <span class="section-title-main">{{ $t('operationSteps') }}</span>
+                <span class="section-subtitle">{{ $t('operationSuggestion') }}</span>
+              </div>
             </div>
           </template>
 
@@ -36,7 +42,7 @@
                   data-operation="extractPlots"
                 >
                   <el-icon><Document /></el-icon>
-                  Step1: 提取剧情
+                  {{ $t('steps.step1') }}
                 </el-button>
               </el-col>
               <el-col :span="6">
@@ -49,7 +55,7 @@
                   data-operation="generateHighlight"
                 >
                   <el-icon><VideoPlay /></el-icon>
-                  Step2: 生成高光视频
+                  {{ $t('steps.step2') }}
                 </el-button>
               </el-col>
               <el-col :span="6">
@@ -62,7 +68,7 @@
                   data-operation="generateNarration"
                 >
                   <el-icon><Microphone /></el-icon>
-                  Step3: 生成视频旁白
+                  {{ $t('steps.step3') }}
                 </el-button>
               </el-col>
               <el-col :span="6">
@@ -75,7 +81,7 @@
                   data-operation="generateNarrationVideo"
                 >
                   <el-icon><Film /></el-icon>
-                  Step4: 合成旁白视频
+                  {{ $t('steps.step4') }}
                 </el-button>
               </el-col>
             </el-row>
@@ -84,7 +90,7 @@
           <!-- Operation Parameters Section -->
           <div v-if="selectedOperation" class="operation-params">
             <el-divider content-position="center">
-              <el-tag type="primary" size="large">{{ getOperationTitle(selectedOperation) }} - 参数配置</el-tag>
+              <el-tag type="primary" size="large">{{ $t('paramConfig', { operation: getOperationTitle(selectedOperation) }) }}</el-tag>
             </el-divider>
 
             <!-- Extract Plots Parameters -->
@@ -92,33 +98,12 @@
               <div class="param-group">
                 <h4 class="group-title">
                   <el-icon><Folder /></el-icon>
-                  视频来源 (二选一)
+                  {{ $t('extractPlots.videoSource') }}
                 </h4>
                 <div class="group-content">
                   <el-row :gutter="24">
-                    <el-col :span="24">
-                      <el-form-item label="GCS视频地址" class="form-item-enhanced">
-                        <el-input
-                          v-model="videoGcsLink"
-                          :placeholder="uploadedFile ? '' : 'gs://bucket/path/to/video.mp4'"
-                          @input="handleGcsLinkChange"
-                          size="large"
-                        >
-                          <template #prefix>
-                            <el-icon><Link /></el-icon>
-                          </template>
-                        </el-input>
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-                  
-                  <div class="divider-with-text">
-                    <span>或</span>
-                  </div>
-                  
-                  <el-row>
-                    <el-col :span="24">
-                      <el-form-item label="上传本地文件" class="form-item-enhanced">
+                    <el-col :span="12">
+                      <el-form-item :label="$t('extractPlots.uploadLocalFile')" class="form-item-enhanced">
                         <el-upload
                           ref="uploadRef"
                           class="upload-enhanced"
@@ -132,14 +117,34 @@
                         >
                           <el-icon class="el-icon--upload"><upload-filled /></el-icon>
                           <div class="el-upload__text">
-                            将视频文件拖到此处，或<em>点击上传</em>
+                            {{ $t('extractPlots.dragUpload') }}<em>{{ $t('extractPlots.clickUpload') }}</em>
                           </div>
                           <template #tip>
                             <div class="el-upload__tip">
-                              支持 MP4/MKV/WEBM/MPEG4 格式，文件大小限制 10GB
+                              {{ $t('extractPlots.uploadTip') }}
                             </div>
                           </template>
                         </el-upload>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                      <el-form-item :label="$t('extractPlots.gcsVideoLink')" class="form-item-enhanced">
+                        <el-input
+                          v-model="videoGcsLink"
+                          :placeholder="uploadedFile ? '' : $t('extractPlots.gcsPlaceholder')"
+                          @input="handleGcsLinkChange"
+                          size="large"
+                        >
+                          <template #prefix>
+                            <el-icon><Link /></el-icon>
+                          </template>
+                        </el-input>
+                        <div class="gcs-hint">
+                          <el-text size="small" type="info">
+                            <el-icon><InfoFilled /></el-icon>
+                            {{ $t('extractPlots.gcsHint') }}
+                          </el-text>
+                        </div>
                       </el-form-item>
                     </el-col>
                   </el-row>
@@ -149,15 +154,15 @@
               <div class="param-group">
                 <h4 class="group-title">
                   <el-icon><User /></el-icon>
-                  演员信息
+                  {{ $t('extractPlots.actorsInfo') }}
                 </h4>
                 <div class="group-content">
                   <el-row :gutter="24">
                     <el-col :span="24">
-                      <el-form-item label="演员信息" class="form-item-enhanced">
+                      <el-form-item :label="$t('extractPlots.actorsInfo')" class="form-item-enhanced">
                         <el-input
                           v-model="actorsInfo"
-                          placeholder="演员姓名及角色信息，如：马小帅的扮演者是姜文"
+                          :placeholder="$t('extractPlots.actorsPlaceholder')"
                           size="large"
                           type="textarea"
                           :rows="2"
@@ -178,7 +183,7 @@
                   class="execute-btn"
                 >
                   <el-icon><CaretRight /></el-icon>
-                  执行提取剧情
+                  {{ $t('extractPlots.executeExtract') }}
                 </el-button>
               </div>
             </div>
@@ -188,9 +193,9 @@
               <!-- Prerequisite Check -->
               <div v-if="!sessionId || !plotsResult" class="prerequisite-reminder">
                 <el-alert
-                  title="🎬 请先提取剧情"
+                  :title="$t('generateHighlight.prerequisite')"
                   type="warning"
-                  description="需要先完成 Step1: 提取剧情，才能进行高光视频生成。请返回 Step1 上传视频并提取剧情。"
+                  :description="$t('generateHighlight.prerequisiteDesc')"
                   show-icon
                   :closable="false"
                   class="reminder-alert"
@@ -198,7 +203,7 @@
                 <div class="reminder-actions">
                   <el-button type="primary" @click="selectOperation('extractPlots')" size="large">
                     <el-icon><Document /></el-icon>
-                    返回 Step1: 提取剧情
+                    {{ $t('generateHighlight.backToStep1') }}
                   </el-button>
                 </div>
               </div>
@@ -206,15 +211,15 @@
               <div v-else class="param-group">
                 <h4 class="group-title">
                   <el-icon><User /></el-icon>
-                  高光视频参数
+                  {{ $t('generateHighlight.highlightParams') }}
                 </h4>
                 <div class="group-content">
                   <el-row :gutter="24">
                     <el-col :span="12">
-                      <el-form-item label="高光短片主角" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateHighlight.starring')" class="form-item-enhanced">
                         <el-input
                           v-model="highlightStarring"
-                          placeholder="请输入主角名称"
+                          :placeholder="$t('generateHighlight.starringPlaceholder')"
                           size="large"
                         >
                           <template #prefix>
@@ -224,10 +229,10 @@
                       </el-form-item>
                     </el-col>
                     <el-col :span="12">
-                      <el-form-item label="高光短片时长" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateHighlight.duration')" class="form-item-enhanced">
                         <el-input
                           v-model="highlightDuration"
-                          placeholder="如：5分钟"
+                          :placeholder="$t('generateHighlight.durationPlaceholder')"
                           size="large"
                         >
                           <template #prefix>
@@ -250,7 +255,7 @@
                   class="execute-btn"
                 >
                   <el-icon><CaretRight /></el-icon>
-                  执行生成高光视频
+                  {{ $t('generateHighlight.executeGenerate') }}
                 </el-button>
               </div>
             </div>
@@ -260,9 +265,9 @@
               <!-- Prerequisite Check -->
               <div v-if="!sessionId || !highlightVideoPath" class="prerequisite-reminder">
                 <el-alert
-                  title="🎥 请先生成高光视频"
+                  :title="$t('generateNarration.prerequisite')"
                   type="warning"
-                  description="需要先完成 Step2: 生成高光视频，才能进行视频旁白生成。请返回 Step2 生成高光视频。"
+                  :description="$t('generateNarration.prerequisiteDesc')"
                   show-icon
                   :closable="false"
                   class="reminder-alert"
@@ -270,11 +275,11 @@
                 <div class="reminder-actions">
                   <el-button type="primary" @click="selectOperation('extractPlots')" size="large" v-if="!sessionId || !plotsResult">
                     <el-icon><Document /></el-icon>
-                    返回 Step1: 提取剧情
+                    {{ $t('generateHighlight.backToStep1') }}
                   </el-button>
                   <el-button type="success" @click="selectOperation('generateHighlight')" size="large" v-else>
                     <el-icon><VideoPlay /></el-icon>
-                    返回 Step2: 生成高光视频
+                    {{ $t('generateNarration.backToStep2') }}
                   </el-button>
                 </div>
               </div>
@@ -282,28 +287,28 @@
               <div v-else class="param-group">
                 <h4 class="group-title">
                   <el-icon><EditPen /></el-icon>
-                  角色与风格设定
+                  {{ $t('generateNarration.roleStyleSettings') }}
                 </h4>
                 <div class="group-content">
                   <el-row :gutter="24">
                     <el-col :span="12">
-                      <el-form-item label="角色设定" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateNarration.roleSet')" class="form-item-enhanced">
                         <el-input
                           v-model="roleSet"
                           type="textarea"
                           :rows="3"
-                          placeholder="请描述角色设定，如：将张秋生重新设想为一个超级英雄"
+                          :placeholder="$t('generateNarration.roleSetPlaceholder')"
                           size="large"
                         />
                       </el-form-item>
                     </el-col>
                     <el-col :span="12">
-                      <el-form-item label="影片背景" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateNarration.movieBg')" class="form-item-enhanced">
                         <el-input
                           v-model="narrationMovieBg"
                           type="textarea"
                           :rows="3"
-                          placeholder="影片背景信息，如：视频为《有话好好说》关于角色张秋生的剪辑视频"
+                          :placeholder="$t('generateNarration.movieBgPlaceholder')"
                           size="large"
                         />
                       </el-form-item>
@@ -312,10 +317,10 @@
                   
                   <el-row :gutter="24">
                     <el-col :span="12">
-                      <el-form-item label="叙述风格" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateNarration.narrationStyle')" class="form-item-enhanced">
                         <el-input
                           v-model="narrationStyle"
-                          placeholder="如：王家卫电影风格"
+                          :placeholder="$t('generateNarration.narrationStylePlaceholder')"
                           size="large"
                         >
                           <template #prefix>
@@ -325,10 +330,10 @@
                       </el-form-item>
                     </el-col>
                     <el-col :span="12">
-                      <el-form-item label="角色代号" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateNarration.characterNickname')" class="form-item-enhanced">
                         <el-input
                           v-model="narrationCharacterNickname"
-                          placeholder="角色的称呼方式，如：李保田称之为老李"
+                          :placeholder="$t('generateNarration.characterNicknamePlaceholder')"
                           size="large"
                         >
                           <template #prefix>
@@ -341,7 +346,7 @@
 
                   <el-row :gutter="24">
                     <el-col :span="12">
-                      <el-form-item label="选择配音" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateNarration.selectVoice')" class="form-item-enhanced">
                         <el-select v-model="voiceSelected" size="large" style="width: 100%">
                           <el-option
                             v-for="voice in voices"
@@ -366,7 +371,7 @@
                   class="execute-btn"
                 >
                   <el-icon><CaretRight /></el-icon>
-                  执行生成视频旁白
+                  {{ $t('generateNarration.executeNarration') }}
                 </el-button>
               </div>
             </div>
@@ -376,9 +381,9 @@
               <!-- Prerequisite Check -->
               <div v-if="!sessionId || !highlightVideoPath || !narrationResult.length" class="prerequisite-reminder">
                 <el-alert
-                  title="🎬 请先生成视频旁白"
+                  :title="$t('generateNarrationVideo.prerequisite')"
                   type="warning"
-                  description="需要先完成 Step3: 生成视频旁白，才能进行最终视频合成。请返回相应步骤完成前置操作。"
+                  :description="$t('generateNarrationVideo.prerequisiteDesc')"
                   show-icon
                   :closable="false"
                   class="reminder-alert"
@@ -386,15 +391,15 @@
                 <div class="reminder-actions">
                   <el-button type="primary" @click="selectOperation('extractPlots')" size="large" v-if="!sessionId || !plotsResult">
                     <el-icon><Document /></el-icon>
-                    返回 Step1: 提取剧情
+                    {{ $t('generateHighlight.backToStep1') }}
                   </el-button>
                   <el-button type="success" @click="selectOperation('generateHighlight')" size="large" v-else-if="!highlightVideoPath">
                     <el-icon><VideoPlay /></el-icon>
-                    返回 Step2: 生成高光视频
+                    {{ $t('generateNarration.backToStep2') }}
                   </el-button>
                   <el-button type="warning" @click="selectOperation('generateNarration')" size="large" v-else>
                     <el-icon><Microphone /></el-icon>
-                    返回 Step3: 生成视频旁白
+                    {{ $t('generateNarrationVideo.backToStep3') }}
                   </el-button>
                 </div>
               </div>
@@ -402,12 +407,12 @@
               <div v-else class="param-group">
                 <h4 class="group-title">
                   <el-icon><Tools /></el-icon>
-                  合成配置
+                  {{ $t('generateNarrationVideo.synthConfig') }}
                 </h4>
                 <div class="group-content">
                   <el-row :gutter="24">
                     <el-col :span="8">
-                      <el-form-item label="选择配音" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateNarration.selectVoice')" class="form-item-enhanced">
                         <el-select v-model="voiceSelected" size="large" style="width: 100%">
                           <el-option
                             v-for="voice in voices"
@@ -419,10 +424,10 @@
                       </el-form-item>
                     </el-col>
                     <el-col :span="8">
-                      <el-form-item label="MiniMax API Key" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateNarrationVideo.minimaxApiKey')" class="form-item-enhanced">
                         <el-input
                           v-model="minimaxApiKey"
-                          placeholder="API Key (可选)"
+                          :placeholder="$t('generateNarrationVideo.apiKeyPlaceholder')"
                           show-password
                           size="large"
                         >
@@ -433,10 +438,10 @@
                       </el-form-item>
                     </el-col>
                     <el-col :span="8">
-                      <el-form-item label="MiniMax Group ID" class="form-item-enhanced">
+                      <el-form-item :label="$t('generateNarrationVideo.minimaxGroupId')" class="form-item-enhanced">
                         <el-input
                           v-model="minimaxGroupId"
-                          placeholder="Group ID (可选)"
+                          :placeholder="$t('generateNarrationVideo.groupIdPlaceholder')"
                           size="large"
                         >
                           <template #prefix>
@@ -459,7 +464,7 @@
                   class="execute-btn"
                 >
                   <el-icon><CaretRight /></el-icon>
-                  执行合成旁白视频
+                  {{ $t('generateNarrationVideo.executeSynth') }}
                 </el-button>
               </div>
             </div>
@@ -473,8 +478,8 @@
             <template #header>
               <div class="section-header-simple">
                 <el-icon class="section-icon"><Operation /></el-icon>
-                <span class="section-title-simple">处理结果</span>
-                <el-tag type="success" size="small">点击卡片查看详情</el-tag>
+                <span class="section-title-simple">{{ $t('results.title') }}</span>
+                <el-tag type="success" size="small">{{ $t('results.clickForDetails') }}</el-tag>
               </div>
             </template>
 
@@ -484,26 +489,26 @@
                 <div class="result-item-card" :class="{ 'has-content': plotsResult }" @click="plotsResult && togglePlotsModal()">
                   <div class="result-item-header">
                     <el-icon class="result-item-icon"><Document /></el-icon>
-                    <h4 class="result-item-title">剧情提取结果</h4>
+                    <h4 class="result-item-title">{{ $t('results.plotExtraction') }}</h4>
                   </div>
                   <div class="result-item-content">
                     <div v-if="plotsResult" class="result-summary">
-                      <el-tag type="success" size="small">已完成</el-tag>
-                      <el-button type="primary" link @click="togglePlotsModal()">点击查看详情</el-button>
+                      <el-tag type="success" size="small">{{ $t('results.completed') }}</el-tag>
+                      <el-button type="primary" link @click="togglePlotsModal()">{{ $t('results.clickForDetails2') }}</el-button>
                       <div class="action-buttons">
                         <el-button size="small" type="primary" @click.stop="selectOperationAndScroll('extractPlots')">
                           <el-icon><Refresh /></el-icon>
-                          重新生成
+                          {{ $t('results.regenerate') }}
                         </el-button>
                       </div>
                     </div>
                     <div v-else class="result-placeholder">
                       <el-icon class="placeholder-icon"><Loading /></el-icon>
-                      <p>等待剧情提取...</p>
+                      <p>{{ $t('results.waiting.plots') }}</p>
                       <div class="action-buttons">
                         <el-button size="small" type="primary" @click.stop="selectOperationAndScroll('extractPlots')">
                           <el-icon><CaretRight /></el-icon>
-                          去生成
+                          {{ $t('results.generate') }}
                         </el-button>
                       </div>
                     </div>
@@ -516,11 +521,11 @@
                 <div class="result-item-card" :class="{ 'has-content': highlightVideoPath }" @click="highlightVideoPath && toggleHighlightVideoModal()">
                   <div class="result-item-header">
                     <el-icon class="result-item-icon"><VideoPlay /></el-icon>
-                    <h4 class="result-item-title">高光视频</h4>
+                    <h4 class="result-item-title">{{ $t('results.highlightVideo') }}</h4>
                   </div>
                   <div class="result-item-content">
                     <div v-if="highlightVideoPath" class="result-summary">
-                      <el-tag type="success" size="small">已完成</el-tag>
+                      <el-tag type="success" size="small">{{ $t('results.completed') }}</el-tag>
                       <div class="video-thumbnail">
                         <video 
                           :key="`thumb-highlight-${sessionId}-${highlightVideoPath}`"
@@ -531,21 +536,21 @@
                           <source :src="highlightVideoUrl" type="video/mp4">
                         </video>
                       </div>
-                      <el-button type="primary" link @click="toggleHighlightVideoModal()">点击播放视频</el-button>
+                      <el-button type="primary" link @click="toggleHighlightVideoModal()">{{ $t('results.clickForVideo') }}</el-button>
                       <div class="action-buttons">
                         <el-button size="small" type="success" @click.stop="selectOperationAndScroll('generateHighlight')">
                           <el-icon><Refresh /></el-icon>
-                          重新生成
+                          {{ $t('results.regenerate') }}
                         </el-button>
                       </div>
                     </div>
                     <div v-else class="result-placeholder">
                       <el-icon class="placeholder-icon"><Loading /></el-icon>
-                      <p>等待高光视频生成...</p>
+                      <p>{{ $t('results.waiting.highlight') }}</p>
                       <div class="action-buttons">
                         <el-button size="small" type="success" @click.stop="selectOperationAndScroll('generateHighlight')">
                           <el-icon><CaretRight /></el-icon>
-                          去生成
+                          {{ $t('results.generate') }}
                         </el-button>
                       </div>
                     </div>
@@ -558,30 +563,30 @@
                 <div class="result-item-card" :class="{ 'has-content': narrationResult.length }" @click="narrationResult.length && toggleNarrationModal()">
                   <div class="result-item-header">
                     <el-icon class="result-item-icon"><ChatLineRound /></el-icon>
-                    <h4 class="result-item-title">旁白内容</h4>
+                    <h4 class="result-item-title">{{ $t('results.narrationContent') }}</h4>
                   </div>
                   <div class="result-item-content">
                     <div v-if="narrationResult.length" class="result-summary">
-                      <el-tag type="success" size="small">已完成</el-tag>
-                      <p class="summary-text">已生成 {{ narrationResult.length }} 段旁白</p>
+                      <el-tag type="success" size="small">{{ $t('results.completed') }}</el-tag>
+                      <p class="summary-text">{{ $t('results.narrationCount', { count: narrationResult.length }) }}</p>
                       <div class="narration-preview">
                         <p class="preview-text">{{ narrationResult[0]?.narration?.substring(0, 50) }}...</p>
                       </div>
-                      <el-button type="primary" link>点击查看详情</el-button>
+                      <el-button type="primary" link>{{ $t('results.clickForDetails2') }}</el-button>
                       <div class="action-buttons">
                         <el-button size="small" type="warning" @click.stop="selectOperationAndScroll('generateNarration')">
                           <el-icon><Refresh /></el-icon>
-                          重新生成
+                          {{ $t('results.regenerate') }}
                         </el-button>
                       </div>
                     </div>
                     <div v-else class="result-placeholder">
                       <el-icon class="placeholder-icon"><Loading /></el-icon>
-                      <p>等待旁白生成...</p>
+                      <p>{{ $t('results.waiting.narration') }}</p>
                       <div class="action-buttons">
                         <el-button size="small" type="warning" @click.stop="selectOperationAndScroll('generateNarration')">
                           <el-icon><CaretRight /></el-icon>
-                          去生成
+                          {{ $t('results.generate') }}
                         </el-button>
                       </div>
                     </div>
@@ -594,11 +599,11 @@
                 <div class="result-item-card" :class="{ 'has-content': finalVideoPath }" @click="finalVideoPath && toggleFinalVideoModal()">
                   <div class="result-item-header">
                     <el-icon class="result-item-icon"><Film /></el-icon>
-                    <h4 class="result-item-title">最终合成视频</h4>
+                    <h4 class="result-item-title">{{ $t('results.finalVideo') }}</h4>
                   </div>
                   <div class="result-item-content">
               <div v-if="finalVideoPath" class="result-summary">
-                <el-tag type="success" size="small">已完成</el-tag>
+                <el-tag type="success" size="small">{{ $t('results.completed') }}</el-tag>
                 <div class="video-thumbnail">
                   <video 
                     :key="`thumb-final-${sessionId}-${finalVideoPath}`"
@@ -609,21 +614,21 @@
                     <source :src="finalVideoUrl" type="video/mp4">
                   </video>
                 </div>
-                <el-button type="primary" link>点击播放视频</el-button>
+                <el-button type="primary" link>{{ $t('results.clickForVideo') }}</el-button>
                 <div class="action-buttons">
                   <el-button size="small" type="danger" @click.stop="selectOperationAndScroll('generateNarrationVideo')">
                     <el-icon><Refresh /></el-icon>
-                    重新生成
+                    {{ $t('results.regenerate') }}
                   </el-button>
                 </div>
               </div>
                     <div v-else class="result-placeholder">
                       <el-icon class="placeholder-icon"><Loading /></el-icon>
-                      <p>等待最终视频合成...</p>
+                      <p>{{ $t('results.waiting.final') }}</p>
                       <div class="action-buttons">
                         <el-button size="small" type="danger" @click.stop="selectOperationAndScroll('generateNarrationVideo')">
                           <el-icon><CaretRight /></el-icon>
-                          去生成
+                          {{ $t('results.generate') }}
                         </el-button>
                       </div>
                     </div>
@@ -636,13 +641,13 @@
 
         <!-- Detail Modals -->
         <!-- Plots Detail Modal -->
-        <el-dialog v-model="plotsModalVisible" title="剧情提取结果" width="80%" draggable>
+        <el-dialog v-model="plotsModalVisible" :title="$t('modals.plotsResult')" width="80%" draggable>
           <div class="plots-modal-content">
             <el-collapse v-model="activePlotsCollapse">
               <el-collapse-item
                 v-for="(plot, index) in plotsResult"
                 :key="index"
-                :title="`片段 ${index + 1}`"
+                :title="$t('modals.segment', { index: index })"
                 :name="index.toString()"
               >
                 <div class="plot-text">{{ plot }}</div>
@@ -652,7 +657,7 @@
         </el-dialog>
 
         <!-- Highlight Video Modal -->
-        <el-dialog v-model="highlightVideoModalVisible" title="高光视频" width="80%" draggable>
+        <el-dialog v-model="highlightVideoModalVisible" :title="$t('modals.highlightVideo')" width="80%" draggable>
           <div class="video-modal-content">
             <video 
               v-if="highlightVideoPath"
@@ -664,30 +669,30 @@
               @canplay="() => console.log('Highlight video can start playing')"
             >
               <source :src="highlightVideoUrl" type="video/mp4">
-              您的浏览器不支持视频播放。
+              {{ $t('modals.browserNotSupported') }}
             </video>
             <div class="video-modal-actions">
               <el-button type="primary" @click="downloadVideo('highlight')">
                 <el-icon><Download /></el-icon>
-                下载高光视频
+                {{ $t('modals.downloadHighlight') }}
               </el-button>
             </div>
           </div>
         </el-dialog>
 
         <!-- Narration Detail Modal -->
-        <el-dialog v-model="narrationModalVisible" title="旁白内容" width="80%" draggable>
+        <el-dialog v-model="narrationModalVisible" :title="$t('modals.narrationContent')" width="80%" draggable>
           <div class="narration-modal-content">
             <el-table :data="narrationResult" stripe style="width: 100%" max-height="400">
-              <el-table-column prop="timestamp" label="时间戳" width="150" />
-              <el-table-column prop="narration_relative_time" label="相对时间(s)" width="120" />
-              <el-table-column prop="narration" label="旁白内容" />
+              <el-table-column prop="timestamp" :label="$t('modals.timestamp')" width="150" />
+              <el-table-column prop="narration_relative_time" :label="$t('modals.relativeTime')" width="120" />
+              <el-table-column prop="narration" :label="$t('modals.narrationText')" />
             </el-table>
           </div>
         </el-dialog>
 
         <!-- Final Video Modal -->
-        <el-dialog v-model="finalVideoModalVisible" title="最终合成视频" width="80%" draggable>
+        <el-dialog v-model="finalVideoModalVisible" :title="$t('modals.finalVideo')" width="80%" draggable>
           <div class="video-modal-content">
             <video 
               v-if="finalVideoPath"
@@ -699,12 +704,12 @@
               @canplay="() => console.log('Final video can start playing')"
             >
               <source :src="finalVideoUrl" type="video/mp4" />
-              您的浏览器不支持视频播放。
+              {{ $t('modals.browserNotSupported') }}
             </video>
             <div class="video-modal-actions">
               <el-button type="primary" @click="downloadVideo('narration')">
                 <el-icon><Download /></el-icon>
-                下载最终视频
+                {{ $t('modals.downloadFinal') }}
               </el-button>
             </div>
           </div>
@@ -727,34 +732,39 @@
 
 <script>
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import {
   VideoCamera, Guide, Setting, Operation, Document, VideoPlay,
   Microphone, Film, Download, ChatLineRound, UploadFilled,
-  Folder, Link, User, Avatar, Timer, EditPen, Brush, Tools, Key, Loading, CaretRight, Cpu, Refresh
+  Folder, Link, User, Avatar, Timer, EditPen, Brush, Tools, Key, Loading, CaretRight, Cpu, Refresh, InfoFilled
 } from '@element-plus/icons-vue'
+import LanguageSwitcher from './components/LanguageSwitcher.vue'
 
 export default {
   name: 'App',
   components: {
     VideoCamera, Guide, Setting, Operation, Document, VideoPlay,
     Microphone, Film, Download, ChatLineRound, UploadFilled,
-    Folder, Link, User, Avatar, Timer, EditPen, Brush, Tools, Key, Cpu
+    Folder, Link, User, Avatar, Timer, EditPen, Brush, Tools, Key, Cpu,
+    LanguageSwitcher
   },
   setup() {
+    const { t } = useI18n()
+    
     // Reactive data
     const models = ref([])
     const voices = ref([])
     const selectedModel = ref('')
     const selectedOperation = ref('')
-    const videoGcsLink = ref('gs://gemini-oolongz/movie-demo/yhhhs.1.mp4')
-    const actorsInfo = ref('马小帅的扮演者是姜文，张秋生的扮演者是李保田')
-    const highlightStarring = ref('李保田')
-    const highlightDuration = ref('5分钟')
-    const roleSet = ref('将张秋生（由李保田饰演）重新设想为一个超级英雄')
-    const narrationStyle = ref('王家卫电影')
-    const narrationCharacterNickname = ref('李保田称之为老李')
-    const narrationMovieBg = ref('视频为《有话好好说》关于角色张秋生的剪辑视频，请参考此背景以及人物的设定')
+    const videoGcsLink = ref('gs://movie-clip/sample/yhhhs.1.mp4')
+    const actorsInfo = ref(t('defaults.actorsInfo'))
+    const highlightStarring = ref(t('defaults.highlightStarring'))
+    const highlightDuration = ref(t('defaults.highlightDuration'))
+    const roleSet = ref(t('defaults.roleSet'))
+    const narrationStyle = ref(t('defaults.narrationStyle'))
+    const narrationCharacterNickname = ref(t('defaults.narrationCharacterNickname'))
+    const narrationMovieBg = ref(t('defaults.narrationMovieBg'))
     const narrationTypeSelected = ref('第三人称叙事')
     const voiceSelected = ref('')
     const minimaxApiKey = ref('')
@@ -918,7 +928,7 @@ export default {
 
     const extractPlots = async () => {
       if (!canExtractPlots.value) {
-        errorMessage.value = '请填写必要的参数'
+        errorMessage.value = t('errors.fillRequired')
         return
       }
 
@@ -960,7 +970,7 @@ export default {
 
     const generateHighlight = async () => {
       if (!sessionId.value) {
-        errorMessage.value = '请先执行提取剧情'
+        errorMessage.value = t('errors.extractFirst')
         return
       }
 
@@ -1000,7 +1010,7 @@ export default {
 
     const generateNarration = async () => {
       if (!highlightVideoGenerated.value) {
-        errorMessage.value = '请先生成高光视频'
+        errorMessage.value = t('errors.generateHighlightFirst')
         return
       }
 
@@ -1040,7 +1050,7 @@ export default {
 
     const generateNarrationVideo = async () => {
       if (!narrationGenerated.value) {
-        errorMessage.value = '请先生成视频旁白'
+        errorMessage.value = t('errors.generateNarrationFirst')
         return
       }
 
@@ -1115,11 +1125,12 @@ export default {
     }
 
     const getOperationTitle = (operation) => {
+      const { t } = useI18n()
       const titles = {
-        extractPlots: 'Step1: 提取剧情',
-        generateHighlight: 'Step2: 生成高光视频',
-        generateNarration: 'Step3: 生成视频旁白',
-        generateNarrationVideo: 'Step4: 合成旁白视频'
+        extractPlots: t('steps.step1'),
+        generateHighlight: t('steps.step2'),
+        generateNarration: t('steps.step3'),
+        generateNarrationVideo: t('steps.step4')
       }
       return titles[operation] || ''
     }
@@ -1181,14 +1192,13 @@ export default {
 <style scoped>
 .app-container {
   min-height: 100vh;
-  background: linear-gradient(180deg, 
-    #87CEEB 0%, 
-    #87CEEB 60%, 
-    #228B22 60%, 
-    #228B22 80%, 
-    #8B4513 80%);
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 30%, #000000 100%);
   position: relative;
   overflow-x: hidden;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .app-container::before {
@@ -1198,15 +1208,17 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: 
-    radial-gradient(circle at 20px 20px, #FFFFFF 2px, transparent 2px),
-    radial-gradient(circle at 80px 80px, #FFFF00 3px, transparent 3px),
-    radial-gradient(circle at 140px 140px, #FFFFFF 2px, transparent 2px);
-  background-size: 200px 200px, 160px 160px, 180px 180px;
-  background-position: 0 0, 40px 40px, 80px 80px;
-  opacity: 0.3;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(220, 38, 38, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 215, 0, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 40% 80%, rgba(184, 134, 11, 0.05) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
+}
+
+.app-container > * {
+  position: relative;
+  z-index: 1;
 }
 
 .app-header {
@@ -1255,38 +1267,189 @@ export default {
 .title-content {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-start;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.title-actions {
+  margin-left: 20px;
 }
 
 .main-title {
   margin: 0;
-  font-size: 32px;
-  font-weight: 700;
-  color: #1a202c;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  font-size: 42px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.2;
+  letter-spacing: 2px;
+  text-align: left;
+  font-family: 'Noto Serif SC', 'SimSun', '宋体', serif;
+  background: linear-gradient(135deg, #dc2626 0%, #ffd700 25%, #ffffff 50%, #ffd700 75%, #dc2626 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
-  line-height: 1.2;
-  letter-spacing: 0.5px;
-  text-align: left;
+  text-shadow: 
+    0 0 10px rgba(220, 38, 38, 0.3),
+    0 0 20px rgba(255, 215, 0, 0.2),
+    2px 2px 4px rgba(0, 0, 0, 0.3);
+  position: relative;
+  text-transform: none;
+  animation: titleGlow 4s ease-in-out infinite alternate;
+  filter: contrast(1.2) brightness(1.1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.main-title::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -10px;
+  right: -10px;
+  bottom: -5px;
+  background: linear-gradient(45deg, 
+    rgba(255, 215, 0, 0.1) 0%, 
+    rgba(255, 140, 0, 0.1) 25%,
+    rgba(220, 20, 60, 0.1) 50%,
+    rgba(138, 43, 226, 0.1) 75%,
+    rgba(255, 215, 0, 0.1) 100%);
+  border-radius: 8px;
+  filter: blur(10px);
+  z-index: -1;
+  opacity: 0.6;
+  animation: auraBreathe 3s ease-in-out infinite alternate;
+}
+
+.main-title::after {
+  content: '🎬';
+  position: absolute;
+  left: -60px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 28px;
+  opacity: 0.8;
+  animation: filmIconRotate 8s linear infinite;
+}
+
+@keyframes titleGlow {
+  0% {
+    text-shadow: 
+      0 0 10px rgba(255, 255, 255, 0.3),
+      0 0 20px rgba(255, 215, 0, 0.2),
+      0 0 30px rgba(255, 140, 0, 0.1);
+  }
+  100% {
+    text-shadow: 
+      0 0 20px rgba(255, 255, 255, 0.5),
+      0 0 30px rgba(255, 215, 0, 0.3),
+      0 0 40px rgba(220, 20, 60, 0.2),
+      0 0 50px rgba(138, 43, 226, 0.1);
+  }
+}
+
+@keyframes auraBreathe {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes filmIconRotate {
+  0% {
+    transform: translateY(-50%) rotate(0deg);
+    opacity: 0.6;
+  }
+  25% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateY(-50%) rotate(180deg);
+    opacity: 0.7;
+  }
+  75% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-50%) rotate(360deg);
+    opacity: 0.6;
+  }
+}
+
+/* Enhanced title for art academy style */
+.main-title.art-academy {
+  font-family: 'Cormorant Garamond', 'Playfair Display', 'Times New Roman', serif;
+  font-weight: 400;
+  font-style: italic;
+  background: linear-gradient(135deg, 
+    #ffd700 0%, 
+    #ffffff 25%, 
+    #f8f9fa 50%, 
+    #e9ecef 75%, 
+    #ffd700 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  position: relative;
+}
+
+.main-title.art-academy::before {
+  background: linear-gradient(45deg, 
+    rgba(212, 175, 55, 0.15) 0%, 
+    rgba(255, 215, 0, 0.15) 25%,
+    rgba(184, 134, 11, 0.15) 50%,
+    rgba(146, 64, 14, 0.15) 75%,
+    rgba(212, 175, 55, 0.15) 100%);
+}
+
+.main-title.shanghai-studio {
+  font-family: 'Noto Serif SC', 'SimSun', serif;
+  font-weight: 500;
+  background: linear-gradient(135deg, 
+    #dc2626 0%, 
+    #ffffff 30%, 
+    #f8f9fa 60%, 
+    #dc2626 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  border-bottom: 3px solid rgba(220, 38, 38, 0.3);
+  padding-bottom: 8px;
+}
+
+.main-title.shanghai-studio::before {
+  background: linear-gradient(45deg, 
+    rgba(220, 38, 38, 0.1) 0%, 
+    rgba(255, 0, 0, 0.1) 25%,
+    rgba(139, 0, 0, 0.1) 50%,
+    rgba(220, 38, 38, 0.1) 100%);
+}
+
+.main-title.shanghai-studio::after {
+  content: '🎭';
+  left: -55px;
+  animation: theaterMaskFloat 6s ease-in-out infinite alternate;
+}
+
+@keyframes theaterMaskFloat {
+  0% {
+    transform: translateY(-50%) translateX(0) rotate(-5deg);
+  }
+  100% {
+    transform: translateY(-60%) translateX(5px) rotate(5deg);
+  }
 }
 
 .model-info-inline {
-  font-size: 16px;
-  font-weight: 600;
-  color: #4f46e5 !important;
-  opacity: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
   margin-left: 12px;
-  background: none !important;
-  -webkit-background-clip: initial !important;
-  -webkit-text-fill-color: #4f46e5 !important;
-  text-shadow: none !important;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: rgba(79, 70, 229, 0.1) !important;
-  border: 1px solid rgba(79, 70, 229, 0.2);
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .content-area {
@@ -1374,84 +1537,78 @@ export default {
 
 .section-card {
   margin-bottom: 24px;
-  background: linear-gradient(135deg, #FFE5B4 0%, #FFCCCB 100%);
-  border: 6px solid #000000;
-  box-shadow: 
-    inset 0 0 0 4px #FFFFFF,
-    0 8px 0 #000000,
-    0 12px 24px rgba(0, 0, 0, 0.4);
-  border-radius: 24px;
+  background: rgba(26, 26, 46, 0.8);
+  border: 1px solid rgba(120, 119, 198, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
   overflow: hidden;
   position: relative;
-  font-family: 'Courier New', monospace;
+  backdrop-filter: blur(20px);
+}
+
+/* Operations card with black background */
+.operations-card {
+  background: #000000 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .section-card::before {
   content: '';
   position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
-  border: 2px dashed #FF0000;
-  border-radius: 16px;
-  pointer-events: none;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(120, 119, 198, 0.5), transparent);
 }
 
-.section-header {
+.section-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  border-color: rgba(120, 119, 198, 0.4);
+}
+
+/* Unified header styles */
+.section-header-unified {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   width: 100%;
-  font-weight: bold;
-  font-size: 18px;
-  background: linear-gradient(90deg, #FF6B6B 0%, #4ECDC4 50%, #FFD93D 100%);
-  color: #FFFFFF;
-  text-shadow: 2px 2px 0 #000000;
-  padding: 4px 8px;
-  border-radius: 8px;
-  margin: -4px;
-  position: relative;
-  z-index: 1;
+  background: #000000;
+  padding: 16px 20px;
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
-.section-header .section-info {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.header-model-info {
-  margin-left: auto;
+.section-title-main {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-.header-model-info .el-tag {
+.section-subtitle {
   font-size: 13px;
-  font-weight: bold;
-  color: #000000;
-  background: linear-gradient(45deg, #FFD700 0%, #FFA500 100%);
-  border: 3px solid #000000;
-  padding: 8px 16px;
-  height: auto;
-  line-height: 1.2;
-  border-radius: 20px;
-  transition: all 0.2s ease-out;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  box-shadow: 0 4px 0 #B8860B, 0 6px 12px rgba(0, 0, 0, 0.3);
-}
-
-
-.header-model-info .el-tag .el-icon {
-  margin-right: 4px;
-  color: #FF0000;
-  filter: drop-shadow(1px 1px 0 #FFFFFF);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.7);
+  margin-left: 8px;
+  font-style: italic;
 }
 
 .section-icon {
-  font-size: 24px;
-  color: #FFD700;
-  filter: drop-shadow(2px 2px 0 #000000);
+  font-size: 20px;
+  color: rgba(120, 219, 255, 0.9);
 }
 
 .section-header-simple {
@@ -1461,7 +1618,7 @@ export default {
   width: 100%;
   font-weight: 600;
   font-size: 16px;
-  color: #1e293b;
+  color: #ffffff;
   text-shadow: none;
   padding: 8px 0;
   background: none;
@@ -1471,7 +1628,7 @@ export default {
 .section-title-simple {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: #ffffff;
   text-shadow: none;
 }
 
@@ -1488,7 +1645,7 @@ export default {
   height: 72px;
   border-radius: 16px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1498,6 +1655,12 @@ export default {
   overflow: hidden;
   border: 2px solid transparent;
   backdrop-filter: blur(10px);
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.8px;
 }
 
 .operation-btn::before {
@@ -1526,139 +1689,59 @@ export default {
 }
 
 .operation-btn.step1 {
-  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-  border: 4px solid #000000;
-  color: #000000;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  font-weight: 900;
-  text-shadow: 1px 1px 0 #FFFFFF;
-  box-shadow: 
-    inset 0 0 0 2px #FFFFFF,
-    0 4px 0 #B8860B,
-    0 6px 12px rgba(0, 0, 0, 0.3);
-  position: relative;
-}
-
-.operation-btn.step1::before {
-  content: '🎬';
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  font-size: 20px;
-  animation: coinSpin 2s linear infinite;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  color: #495057;
+  font-weight: 500;
 }
 
 .operation-btn.step1:hover:not(:disabled) {
-  background: linear-gradient(135deg, #FFFF00 0%, #FFD700 100%);
-  transform: translateY(-6px) scale(1.03);
-  box-shadow: 
-    inset 0 0 0 2px #FFFFFF,
-    0 6px 0 #B8860B,
-    0 8px 16px rgba(0, 0, 0, 0.4);
-  animation: powerUpBounce 0.3s ease-out;
+  background: #f8f9fa;
+  border-color: #007bff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .operation-btn.step2 {
-  background: linear-gradient(135deg, #32CD32 0%, #228B22 100%);
-  border: 4px solid #000000;
-  color: #FFFFFF;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  font-weight: 900;
-  text-shadow: 2px 2px 0 #000000;
-  box-shadow: 
-    inset 0 0 0 2px #FFFFFF,
-    0 4px 0 #006400,
-    0 6px 12px rgba(0, 0, 0, 0.3);
-  position: relative;
-}
-
-.operation-btn.step2::before {
-  content: '🍄';
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  font-size: 20px;
-  animation: mushroomBounce 1.5s ease-in-out infinite;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  color: #495057;
+  font-weight: 500;
 }
 
 .operation-btn.step2:hover:not(:disabled) {
-  background: linear-gradient(135deg, #00FF00 0%, #32CD32 100%);
-  transform: translateY(-6px) scale(1.03);
-  box-shadow: 
-    inset 0 0 0 2px #FFFFFF,
-    0 6px 0 #006400,
-    0 8px 16px rgba(0, 0, 0, 0.4);
-  animation: powerUpBounce 0.3s ease-out;
+  background: #f8f9fa;
+  border-color: #007bff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .operation-btn.step3 {
-  background: linear-gradient(135deg, #FF4500 0%, #FF0000 100%);
-  border: 4px solid #000000;
-  color: #FFFFFF;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  font-weight: 900;
-  text-shadow: 2px 2px 0 #000000;
-  box-shadow: 
-    inset 0 0 0 2px #FFFFFF,
-    0 4px 0 #8B0000,
-    0 6px 12px rgba(0, 0, 0, 0.3);
-  position: relative;
-}
-
-.operation-btn.step3::before {
-  content: '🌟';
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  font-size: 20px;
-  animation: starTwinkle 1s ease-in-out infinite alternate;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  color: #495057;
+  font-weight: 500;
 }
 
 .operation-btn.step3:hover:not(:disabled) {
-  background: linear-gradient(135deg, #FF6347 0%, #FF4500 100%);
-  transform: translateY(-6px) scale(1.03);
-  box-shadow: 
-    inset 0 0 0 2px #FFFFFF,
-    0 6px 0 #8B0000,
-    0 8px 16px rgba(0, 0, 0, 0.4);
-  animation: powerUpBounce 0.3s ease-out;
+  background: #f8f9fa;
+  border-color: #007bff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .operation-btn.step4 {
-  background: linear-gradient(135deg, #8A2BE2 0%, #4B0082 100%);
-  border: 4px solid #000000;
-  color: #FFFFFF;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  font-weight: 900;
-  text-shadow: 2px 2px 0 #000000;
-  box-shadow: 
-    inset 0 0 0 2px #FFFFFF,
-    0 4px 0 #2F004F,
-    0 6px 12px rgba(0, 0, 0, 0.3);
-  position: relative;
-}
-
-.operation-btn.step4::before {
-  content: '👑';
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  font-size: 20px;
-  animation: crownFloat 2s ease-in-out infinite;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  color: #495057;
+  font-weight: 500;
 }
 
 .operation-btn.step4:hover:not(:disabled) {
-  background: linear-gradient(135deg, #9932CC 0%, #8A2BE2 100%);
-  transform: translateY(-6px) scale(1.03);
-  box-shadow: 
-    inset 0 0 0 2px #FFFFFF,
-    0 6px 0 #2F004F,
-    0 8px 16px rgba(0, 0, 0, 0.4);
-  animation: powerUpBounce 0.3s ease-out;
+  background: #f8f9fa;
+  border-color: #007bff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 @keyframes coinSpin {
@@ -1701,31 +1784,31 @@ export default {
 }
 
 .operation-btn.step1.selected {
-  background: #4c51bf !important;
+  background: #007bff !important;
   color: white !important;
-  box-shadow: 0 8px 32px rgba(76, 81, 191, 0.4);
-  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  border-color: #007bff;
 }
 
 .operation-btn.step2.selected {
-  background: #ed64a6 !important;
+  background: #007bff !important;
   color: white !important;
-  box-shadow: 0 8px 32px rgba(237, 100, 166, 0.4);
-  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  border-color: #007bff;
 }
 
 .operation-btn.step3.selected {
-  background: #4299e1 !important;
+  background: #007bff !important;
   color: white !important;
-  box-shadow: 0 8px 32px rgba(66, 153, 225, 0.4);
-  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  border-color: #007bff;
 }
 
 .operation-btn.step4.selected {
-  background: #48bb78 !important;
+  background: #007bff !important;
   color: white !important;
-  box-shadow: 0 8px 32px rgba(72, 187, 120, 0.4);
-  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  border-color: #007bff;
 }
 
 /* Operation parameters section styling */
@@ -1751,41 +1834,38 @@ export default {
 }
 
 .operation-params .el-divider__text {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  padding: 12px 24px;
-  border-radius: 20px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
+  background: #f8f9fa;
+  color: #495057;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
 }
 
 .operation-params .params-section {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(15px);
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
 }
 
 .operation-params .params-section:hover {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
 }
 
 /* Execute section styling */
 .execute-section {
-  margin-top: 32px;
-  padding: 24px;
-  background: linear-gradient(135deg, rgba(249, 250, 251, 0.9) 0%, rgba(243, 244, 246, 0.8) 100%);
-  border-radius: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  margin-top: 24px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
   text-align: center;
   transition: all 0.3s ease;
 }
 
 .execute-section:hover {
-  background: linear-gradient(135deg, rgba(247, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.9) 100%);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  background: #e9ecef;
   transform: translateY(-1px);
 }
 
@@ -1975,9 +2055,11 @@ export default {
 
 .params-section {
   padding: 24px 16px;
-  background: rgba(249, 250, 251, 0.8);
+  background: #1a1a1a;
   border-radius: 8px;
   margin-top: 16px;
+  border: 1px solid #2a2a2a;
+  backdrop-filter: blur(15px);
 }
 
 .param-group {
@@ -1994,12 +2076,18 @@ export default {
   gap: 8px;
   font-size: 15px;
   font-weight: 600;
-  color: #374151;
-  margin-bottom: 20px;
+  color: #2c3e50;
+  margin-bottom: 16px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.8);
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
   border-radius: 8px;
-  border-left: 4px solid #409eff;
+  border-left: 4px solid #dc2626;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.3px;
 }
 
 .group-content {
@@ -2013,7 +2101,7 @@ export default {
 .form-item-enhanced :deep(.el-form-item__label) {
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: #495057;
   margin-bottom: 8px;
 }
 
@@ -2307,8 +2395,8 @@ export default {
 
 /* Results Section Styles */
 .results-overview-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 2px solid rgba(64, 158, 255, 0.1);
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -2318,35 +2406,21 @@ export default {
 }
 
 .result-item-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.7) 100%);
-  border: 2px solid rgba(0, 0, 0, 0.05);
-  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
   padding: 20px;
   height: 280px;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
   cursor: pointer;
   position: relative;
-  overflow: hidden;
-  backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
 }
 
-.result-item-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(64, 158, 255, 0.08), transparent);
-  transition: left 0.6s;
-}
-
-
 .result-item-card.has-content {
-  border-color: rgba(34, 197, 94, 0.2);
-  background: linear-gradient(135deg, rgba(240, 253, 244, 0.9) 0%, rgba(236, 253, 245, 0.7) 100%);
+  border-color: #007bff;
+  background: #f8f9fa;
 }
 
 
@@ -2365,20 +2439,20 @@ export default {
 }
 
 .result-item-icon {
-  font-size: 24px;
-  color: #64748b;
+  font-size: 20px;
+  color: #6c757d;
   transition: all 0.3s ease;
 }
 
 .result-item-card.has-content .result-item-icon {
-  color: #059669;
+  color: #007bff;
 }
 
 .result-item-title {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: #495057;
   line-height: 1.2;
 }
 
@@ -2400,7 +2474,7 @@ export default {
 .summary-text {
   margin: 0;
   font-size: 14px;
-  color: #64748b;
+  color: #6c757d;
   font-weight: 500;
 }
 
@@ -2415,17 +2489,17 @@ export default {
 
 
 .narration-preview {
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
   padding: 12px;
   margin: 8px 0;
-  border-left: 3px solid #059669;
+  border-left: 3px solid #007bff;
 }
 
 .preview-text {
   margin: 0;
   font-size: 13px;
-  color: #475569;
+  color: #6c757d;
   font-style: italic;
   line-height: 1.4;
 }
@@ -2435,7 +2509,7 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .placeholder-icon {
@@ -2884,5 +2958,47 @@ export default {
 .reminder-actions .el-button:focus-visible {
   outline: 3px solid rgba(255, 255, 255, 0.5);
   outline-offset: 2px;
+}
+
+/* GCS Hint Styles */
+.gcs-hint {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 197, 253, 0.05) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gcs-hint .el-text {
+  font-size: 12px !important;
+  color: #64748b !important;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gcs-hint .el-icon {
+  font-size: 14px;
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .gcs-hint {
+    padding: 6px 10px;
+    margin-top: 6px;
+  }
+  
+  .gcs-hint .el-text {
+    font-size: 11px !important;
+  }
+  
+  .gcs-hint .el-icon {
+    font-size: 12px;
+  }
 }
 </style>

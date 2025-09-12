@@ -5,14 +5,14 @@ import concurrent.futures
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
 from google.oauth2 import service_account
-from ailib.env_config import GCS_PROJECT_ID, SA_KEY_FILE_PATH, GCS_AUTH_TYPE
+from ailib.env_config import GCS_PROJECT_ID, SA_KEY_FILE_PATH, GCS_AUTH_TYPE, DOWNLOAD_GCS_AUTH_TYPE,DOWNLOAD_GCS_PROJECT_ID
 
-def _get_gcs_credentials():
+def _get_gcs_credentials(auth_type="SA"):
     """
     根据 GCS_AUTH_TYPE 获取 GCS 凭据
     """
     credentials = None
-    if GCS_AUTH_TYPE == "SA":
+    if auth_type == "SA":
         if SA_KEY_FILE_PATH and os.path.exists(SA_KEY_FILE_PATH):
             credentials = service_account.Credentials.from_service_account_file(
                 SA_KEY_FILE_PATH, 
@@ -32,7 +32,21 @@ def init_client():
     根据 GCS_PROJECT_ID 和 GCS_AUTH_TYPE 配置
     """
     project_id = GCS_PROJECT_ID
-    credentials = _get_gcs_credentials()
+    credentials = _get_gcs_credentials(GCS_AUTH_TYPE)
+    
+    storage_client = storage.Client(
+        project=project_id,
+        credentials=credentials
+    )
+    return storage_client
+
+def init_download_client():
+    """
+    初始化 GCS 客户端
+    根据 GCS_PROJECT_ID 和 GCS_AUTH_TYPE 配置
+    """
+    project_id = DOWNLOAD_GCS_PROJECT_ID
+    credentials = _get_gcs_credentials(DOWNLOAD_GCS_AUTH_TYPE)
     
     storage_client = storage.Client(
         project=project_id,
@@ -73,7 +87,7 @@ def download_gcs_object(gcs_uri: str, local_destination_path: str = None) -> boo
             return False
 
         # 初始化 GCS 客户端
-        storage_client = init_client()
+        storage_client = init_download_client()
 
         # 获取 bucket 和 blob
         bucket = storage_client.bucket(bucket_name)

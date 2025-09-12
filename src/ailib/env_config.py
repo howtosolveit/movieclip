@@ -4,38 +4,24 @@ from pathlib import Path
 
 def get_env_var(key, default=None):
     """
-    获取环境变量，按优先级顺序：
-    1. 系统环境变量
-    2. .env文件中的变量
-    3. 默认值
+    获取环境变量，仅从 src/.env 文件读取
     """
-    # 首先检查系统环境变量
-    system_value = os.environ.get(key)
-    if system_value is not None:
-        return system_value
+    # 指定 src/.env 文件路径
+    env_path = Path(__file__).parent.parent / '.env'  # src/.env
     
-    # 如果系统环境变量不存在，则尝试从.env文件加载
-    # 保存当前环境变量状态
-    original_value = os.environ.get(key)
+    if env_path.exists():
+        
+        # 加载 src/.env 文件
+        load_dotenv(dotenv_path=env_path, override=True)
+        
+        # 获取值
+        dotenv_value = os.environ.get(key)
+        
+        # 如果原来没有这个环境变量，加载后有了，就使用它
+        if dotenv_value is not None:
+            return dotenv_value
     
-    # 尝试多个可能的.env文件位置
-    possible_env_paths = [
-        Path(__file__).parent.parent / '.env',  # src/.env
-        Path(__file__).parent.parent.parent / '.env',  # 项目根目录/.env
-        Path(__file__).parent.parent / 'backend' / '.env',  # src/backend/.env
-        Path('.env'),  # 当前工作目录/.env
-    ]
-    
-    for env_path in possible_env_paths:
-        if env_path.exists():
-            # 临时加载这个.env文件
-            load_dotenv(dotenv_path=env_path, override=False)
-            # 检查是否获取到了值
-            dotenv_value = os.environ.get(key)
-            if dotenv_value is not None and dotenv_value != original_value:
-                return dotenv_value
-    
-    # 如果都没有找到，返回默认值
+    # 如果没有找到，返回默认值
     return default
 
 def get_env_bool(key, default=False):
@@ -58,27 +44,25 @@ def get_env_int(key, default=0):
 # 初始化时输出加载信息（仅在调试时启用）
 def _debug_env_loading():
     """调试环境变量加载情况"""
-    debug_mode = os.environ.get('ENV_DEBUG', 'false').lower() == 'true'
+    # 从 src/.env 读取 ENV_DEBUG 设置
+    env_path = Path(__file__).parent.parent / '.env'
+    debug_mode = False
+    
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path, override=True)
+        debug_mode = os.environ.get('ENV_DEBUG', 'false').lower() == 'true'
+    
     if debug_mode:
         print("=== Environment Variable Loading Debug ===")
-        
-        # 检查可能的.env文件
-        possible_env_paths = [
-            Path(__file__).parent.parent / '.env',
-            Path(__file__).parent.parent.parent / '.env',
-            Path(__file__).parent.parent / 'backend' / '.env',
-            Path('.env'),
-        ]
-        
-        for i, env_path in enumerate(possible_env_paths):
-            print(f"{i+1}. {env_path.absolute()}: {'存在' if env_path.exists() else '不存在'}")
+        print(f"仅从 src/.env 文件加载环境变量")
+        print(f"src/.env 路径: {env_path.absolute()}")
+        print(f"src/.env 存在: {'是' if env_path.exists() else '否'}")
         
         # 测试关键变量
         test_vars = ['MC_BUCKET_NAME', 'PROJECT_ID', 'LOCATION']
         for var in test_vars:
-            sys_val = os.environ.get(var)
             env_val = get_env_var(var)
-            print(f"{var}: 系统={sys_val}, 最终={env_val}")
+            print(f"{var}: {env_val}")
 
 # 执行调试检查
 _debug_env_loading()
@@ -89,6 +73,7 @@ SPEECH_PROJECT_ID = get_env_var("SPEECH_PROJECT_ID")
 IMAGE_PROJECT_ID = get_env_var("IMAGE_PROJECT_ID")
 VIDEO_PROJECT_ID = get_env_var("VIDEO_PROJECT_ID")
 GCS_PROJECT_ID = get_env_var("GCS_PROJECT_ID")
+DOWNLOAD_GCS_PROJECT_ID = get_env_var("DOWNLOAD_GCS_PROJECT_ID")
 LOCATION = get_env_var("LOCATION")
 
 # 服务账户配置
@@ -103,6 +88,7 @@ SPEECH_AUTH_TYPE = get_env_var("SPEECH_AUTH_TYPE", "ADC")
 IMAGE_AUTH_TYPE = get_env_var("IMAGE_AUTH_TYPE", "ADC")
 VIDEO_AUTH_TYPE = get_env_var("VIDEO_AUTH_TYPE", "ADC")
 GCS_AUTH_TYPE = get_env_var("GCS_AUTH_TYPE", "ADC")
+DOWNLOAD_GCS_AUTH_TYPE = get_env_var("DOWNLOAD_GCS_AUTH_TYPE", "ADC")
 
 # 超时配置
 GEMINI_TIMEOUT = get_env_int("GEMINI_CLIENT_TIMEOUT", 300000)
@@ -116,6 +102,7 @@ MC_PARTITION_SECONDS = get_env_int("MC_PARTITION_SECONDS", 600)
 MC_BUCKET_NAME = get_env_var("MC_BUCKET_NAME")
 MC_OBJECT_PREFIX = get_env_var("MC_OBJECT_PREFIX")
 MC_NEED_GCS = get_env_bool("MC_NEED_GCS", True)
+UI_SUPPORT_GCS_URI = get_env_bool("UI_SUPPORT_GCS_URI", True)
 
 # 其他配置
 FFMPEG_EXECUTABLE = get_env_var("FFMPEG_EXECUTABLE", "ffmpeg")
@@ -123,7 +110,13 @@ FFPROBE_EXECUTABLE = get_env_var("FFPROBE_EXECUTABLE", "ffprobe")
 PROXY = get_env_var("PROXY")
 
 # 输出重要配置信息（仅在调试模式下）
-if os.environ.get('ENV_DEBUG', 'false').lower() == 'true':
+env_path = Path(__file__).parent.parent / '.env'
+debug_mode = False
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path, override=True)
+    debug_mode = os.environ.get('ENV_DEBUG', 'false').lower() == 'true'
+
+if debug_mode:
     print("\n=== Final Configuration ===")
     print(f"PROJECT_ID: {PROJECT_ID}")
     print(f"LOCATION: {LOCATION}")

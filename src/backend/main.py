@@ -12,10 +12,13 @@ import shutil
 from ailib import genai_client, voice_keys, genai_speech, video_process, cloud_gcs, config
 from ailib.env_config import (
     PROJECT_ID, LOCATION, SPEECH_PROJECT_ID, 
-    MC_PARTITION_SECONDS, MC_BUCKET_NAME, MC_OBJECT_PREFIX, MC_NEED_GCS,
+    MC_PARTITION_SECONDS, MC_BUCKET_NAME, MC_OBJECT_PREFIX, MC_NEED_GCS, UI_SUPPORT_GCS_URI,
     FFMPEG_EXECUTABLE, FFPROBE_EXECUTABLE
 )
 
+print( PROJECT_ID, LOCATION, SPEECH_PROJECT_ID, 
+    MC_PARTITION_SECONDS, MC_BUCKET_NAME, MC_OBJECT_PREFIX, MC_NEED_GCS,
+    FFMPEG_EXECUTABLE, FFPROBE_EXECUTABLE)
 app = FastAPI(title="MovieClip Processing API", version="1.0.0")
 
 # Enable CORS for frontend
@@ -305,7 +308,8 @@ async def get_config():
         response = {
             "success": True,
             "models": models,
-            "voices": voices
+            "voices": voices,
+            "uiSupportGcsUri": UI_SUPPORT_GCS_URI
         }
         print(f"Config response: {response}")
         return response
@@ -314,7 +318,8 @@ async def get_config():
         fallback_response = {
             "success": True,
             "models": ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"],
-            "voices": ["google_AliceSample", "minimax_Alex", "google_BethSample"]
+            "voices": ["google_AliceSample", "minimax_Alex", "google_BethSample"],
+            "uiSupportGcsUri": True
         }
         print(f"Fallback config response: {fallback_response}")
         return fallback_response
